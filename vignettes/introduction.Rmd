@@ -1,0 +1,391 @@
+---
+title: "Introduction to SNP-Slice"
+author: "Maxwell Murphy"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to SNP-Slice}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+
+# Load required packages for plotting
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+# IN DEVELOPMENT TUTORIAL
+
+## Overview
+
+SNP-Slice is a Bayesian nonparametric method for resolving multi-strain infections using slice sampling with stick-breaking construction. The algorithm simultaneously unveils strain haplotypes and links them to hosts from sequencing data.
+
+This vignette demonstrates how to use SNP-Slice with the negative binomial model using real example data.
+
+## Installation
+
+```{r eval=FALSE}
+# Install from GitHub (when available)
+devtools::install_github("yourusername/snp-slice")
+
+# Or install locally
+devtools::install_local("path/to/snp.slice")
+```
+
+## Basic Usage
+
+### Loading the Package
+
+```{r}
+library(snp.slice)
+```
+
+### Working with Example Data
+
+SNP-Slice includes example read count data from a multi-strain infection study:
+
+```{r}
+# Load the example data
+data(example_snp_data, package = "snp.slice")
+
+# Extract the data
+read0 <- example_snp_data$read0
+read1 <- example_snp_data$read1
+
+# Create data list
+data <- list(read0 = read0, read1 = read1)
+
+# Display data information
+cat("Data dimensions:", nrow(read0), "hosts ×", ncol(read0), "SNPs\n")
+cat("Read0 (reference allele) range:", range(read0), "\n")
+cat("Read1 (alternative allele) range:", range(read1), "\n")
+cat("Total read depth range:", range(read0 + read1), "\n")
+```
+
+### Loading Pre-computed Results
+
+For this vignette, we'll load pre-computed results from a SNP-Slice analysis using the negative binomial model:
+
+```{r}
+# Load pre-computed results
+result <- load_example_results()
+cat("Pre-computed results loaded successfully!\n")
+```
+
+### Examining Results
+
+Let's examine the results from our analysis:
+
+```{r}
+# Print basic information
+print(result)
+
+# Get detailed summary
+summary(result)
+```
+
+### Extracting Key Information
+
+```{r}
+# Extract strain information
+strains <- extract_strains(result)
+cat("Number of strains identified:", strains$n_strains, "\n")
+cat("Number of SNPs:", strains$n_snps, "\n")
+
+# Extract allocation information
+allocations <- extract_allocations(result)
+cat("Number of hosts:", allocations$n_hosts, "\n")
+cat("Multiplicity of infection (MOI) summary:\n")
+print(summary(allocations$multiplicity_of_infection))
+```
+
+### Analyzing Strain Patterns
+
+```{r}
+# Access the dictionary matrix (strains × SNPs)
+D <- result$dictionary_matrix
+cat("Dictionary matrix dimensions:", dim(D), "\n")
+
+# Show the first few strains and SNPs
+print(D[1:min(5, nrow(D)), 1:min(10, ncol(D))])
+
+# Count unique strain patterns
+unique_patterns <- unique(D)
+cat("Number of unique strain patterns:", nrow(unique_patterns), "\n")
+```
+
+### Analyzing Host Allocations
+
+```{r}
+# Access the allocation matrix (hosts × strains)
+A <- result$allocation_matrix
+cat("Allocation matrix dimensions:", dim(A), "\n")
+
+# Show the first few hosts and their strain allocations
+print(A[1:min(5, nrow(A)), 1:min(5, ncol(A))])
+
+# Analyze strain frequencies across hosts
+strain_frequencies <- colSums(A)
+cat("Strain frequencies (number of hosts infected):\n")
+print(table(strain_frequencies))
+```
+
+## Running Your Own Analysis
+
+If you want to run the analysis yourself, here's how to do it:
+
+```{r eval=FALSE}
+# Run SNP-Slice with the negative binomial model
+result <- snp_slice(data, 
+                   model = "negative_binomial",
+                   n_mcmc = 200,        # Number of MCMC iterations
+                   store_mcmc = TRUE,   # Store MCMC samples for diagnostics
+                   verbose = TRUE)      # Show progress
+```
+
+## Parameter Tuning
+
+You can adjust various parameters to optimize performance:
+
+```{r eval=FALSE}
+# Custom parameters
+result_tuned <- snp_slice(data,
+                         alpha = 1.5,        # IBP concentration parameter
+                         rho = 0.3,          # Dictionary sparsity
+                         threshold = 0.005,  # Single infection threshold
+                         n_mcmc = 200,
+                         burnin = 20,        # Custom burn-in
+                         gap = 10,           # Early stopping threshold
+                         seed = 456,         # Reproducibility
+                         verbose = FALSE)
+```
+
+## Convergence Diagnostics
+
+When you store MCMC samples, you can analyze convergence:
+
+```{r}
+# Calculate effective sample size for log posterior
+if (!is.null(result$mcmc_samples)) {
+  ess_logpost <- effective_sample_size(result, parameter = "logpost")
+  if (!is.null(ess_logpost) && is.numeric(ess_logpost)) {
+    cat("Effective sample size (logpost):", round(ess_logpost, 1), "\n")
+  } else {
+    cat("Could not calculate effective sample size\n")
+  }
+} else {
+  cat("MCMC samples not stored in results\n")
+}
+```
+
+## Working with Results
+
+### Accessing Key Matrices
+
+```{r}
+# Get the key matrices from results
+A <- result$allocation_matrix      # Hosts × Strains
+D <- result$dictionary_matrix      # Strains × SNPs
+
+cat("Allocation matrix dimensions:", dim(A), "\n")
+cat("Dictionary matrix dimensions:", dim(D), "\n")
+
+# Show sample of allocation matrix
+cat("Sample of allocation matrix (first 3 hosts, first 5 strains):\n")
+print(A[1:3, 1:5])
+```
+
+### Analyzing Strain Diversity (MOI)
+
+```{r}
+# Calculate strain diversity per host (same as Multiplicity of Infection)
+strain_diversity <- rowSums(A > 0)
+cat("Strain diversity per host (MOI):\n")
+print(table(strain_diversity))
+```
+
+## Visualizing Results
+
+Let's create some informative plots to better understand the analysis results:
+
+### Multiplicity of Infection (MOI) Distribution
+
+```{r}
+# Get MOI from allocations (same as strain diversity)
+allocations <- extract_allocations(result)
+moi_df <- data.frame(
+  moi = allocations$multiplicity_of_infection,
+  host_id = 1:length(allocations$multiplicity_of_infection)
+)
+
+ggplot(moi_df, aes(x = moi)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", alpha = 0.7, color = "black") +
+  geom_vline(aes(xintercept = mean(moi)), color = "red", linetype = "dashed", size = 1) +
+  labs(
+    title = "Distribution of Multiplicity of Infection (MOI)",
+    subtitle = "Number of Strains per Host",
+    x = "Number of Strains per Host",
+    y = "Number of Hosts",
+    caption = paste("Mean MOI:", round(mean(moi_df$moi), 2), "| Max MOI:", max(moi_df$moi))
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, color = "gray"),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+
+### Strain Frequency Analysis
+
+```{r}
+# Calculate strain frequencies
+strain_frequencies <- colSums(A)
+freq_df <- data.frame(
+  strain_id = 1:length(strain_frequencies),
+  frequency = strain_frequencies
+)
+
+# Plot strain frequencies
+ggplot(freq_df, aes(x = reorder(strain_id, frequency), y = frequency)) +
+  geom_bar(stat = "identity", fill = "darkgreen", alpha = 0.7) +
+  labs(
+    title = "Strain Frequencies Across Hosts",
+    x = "Strain ID",
+    y = "Number of Hosts Infected",
+    caption = paste("Total strains:", length(strain_frequencies))
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 10)
+  )
+```
+
+
+
+### Strain Pattern Heatmap
+
+```{r}
+# Create a heatmap of the first 20 strains and first 30 SNPs
+D_subset <- D[1:min(20, nrow(D)), 1:min(30, ncol(D))]
+
+# Convert to long format for ggplot
+heatmap_data <- expand.grid(
+  strain = 1:nrow(D_subset),
+  snp = 1:ncol(D_subset)
+)
+heatmap_data$value <- as.vector(D_subset)
+
+ggplot(heatmap_data, aes(x = snp, y = strain, fill = factor(value))) +
+  geom_tile() +
+  scale_fill_manual(
+    values = c("0" = "white", "1" = "darkblue"),
+    labels = c("0" = "Reference", "1" = "Alternative"),
+    name = "Allele"
+  ) +
+  labs(
+    title = "Strain Patterns (First 20 Strains, First 30 SNPs)",
+    x = "SNP Position",
+    y = "Strain ID"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "bottom"
+  )
+```
+
+### Host-Strain Allocation Heatmap
+
+```{r}
+# Create a heatmap of host-strain allocations (first 50 hosts, first 20 strains)
+A_subset <- A[1:min(50, nrow(A)), 1:min(20, ncol(A))]
+
+# Convert to long format for ggplot
+allocation_data <- expand.grid(
+  host = 1:nrow(A_subset),
+  strain = 1:ncol(A_subset)
+)
+allocation_data$value <- as.vector(A_subset)
+
+ggplot(allocation_data, aes(x = strain, y = host, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(
+    low = "white", 
+    high = "red",
+    name = "Allocation\nWeight"
+  ) +
+  labs(
+    title = "Host-Strain Allocations (First 50 Hosts, First 20 Strains)",
+    x = "Strain ID",
+    y = "Host ID"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "bottom"
+  )
+```
+
+### Summary Statistics
+
+```{r}
+# Create summary statistics
+summary_stats <- data.frame(
+  Metric = c(
+    "Total Hosts",
+    "Total SNPs", 
+    "Total Strains",
+    "Mean MOI",
+    "Max MOI",
+    "Single Infections",
+    "Multiple Infections"
+  ),
+  Value = c(
+    nrow(A),
+    ncol(D),
+    ncol(A),
+    round(mean(allocations$multiplicity_of_infection), 2),
+    max(allocations$multiplicity_of_infection),
+    sum(allocations$multiplicity_of_infection == 1),
+    sum(allocations$multiplicity_of_infection > 1)
+  )
+)
+
+# Display summary table
+knitr::kable(summary_stats, 
+             col.names = c("Metric", "Value"),
+             caption = "Summary Statistics from SNP-Slice Analysis")
+```
+
+## Next Steps
+
+This vignette covered the basics of using SNP-Slice with the negative binomial model. For more advanced usage:
+
+1. **Other Models**: Try Poisson, binomial, or categorical models
+2. **Advanced Diagnostics**: Learn about convergence diagnostics and troubleshooting
+3. **Real Data**: Apply SNP-Slice to your own sequencing data
+4. **Parameter Optimization**: Fine-tune parameters for your specific application
+
+## References
+
+For more information about the SNP-Slice algorithm, see:
+
+- SNP-Slice Resolves Mixed Infections: Simultaneously Unveiling Strain Haplotypes and Linking Them to Hosts
+- [BioRxiv preprint](https://www.biorxiv.org/content/10.1101/2023.07.29.551098v2)

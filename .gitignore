@@ -1,0 +1,43 @@
+/doc/
+/Meta/
+.DS_Store
+
+# R specific files
+.Rhistory
+.RData
+.Ruserdata
+.Rapp.history
+
+# RStudio files
+.Rproj.user/
+*.Rproj
+
+# R package build artifacts
+*.tar.gz
+*.zip
+*.pdf
+
+# Temporary files
+*.tmp
+*.swp
+*~
+*.log
+
+# R package specific
+inst/doc/
+vignettes/*.html
+vignettes/*.pdf
+
+# OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE specific
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup

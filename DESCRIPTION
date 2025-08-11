@@ -1,0 +1,29 @@
+Package: snp.slice
+Title: Bayesian Nonparametric Resolution of Multi-Strain Infections
+Version: 0.1.0
+Authors@R: 
+    person(given = "Nianqiao", family = "Ju", orcid = "0000-0002-8861-4087")
+    person(given = "Maxwell", family = "Murphy", orcid = "0000-0003-0332-4388")
+Description: A Bayesian nonparametric method for resolving multi-strain infections 
+    using slice sampling with stick-breaking construction. The algorithm simultaneously 
+    estimates strain haplotypes and links them to hosts from sequencing data. Supports 
+    multiple observation models including categorical, Poisson, binomial, and negative 
+    binomial distributions. 
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    ggplot2,
+    dplyr,
+    tidyr,
+    readr
+VignetteBuilder: knitr
+URL: https://github.com/plasmogenepi/snp.slice
+BugReports: https://github.com/plasmogenepi/snp.slice/issues
+Depends: 
+    R (>= 4.0)
+LazyData: true
