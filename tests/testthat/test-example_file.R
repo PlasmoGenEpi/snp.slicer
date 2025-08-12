@@ -1,6 +1,6 @@
 test_that("example categorical file can be processed and run", {
   # Skip if the example file doesn't exist
-  example_file <- system.file("data", "example_cat.txt", package = "snp.slice")
+  example_file <- system.file("data", "example_cat.txt", package = "snp.slicer")
   skip_if_not(file.exists(example_file), "Example file not found")
   
   # Test that we can read the file
@@ -46,7 +46,7 @@ test_that("example categorical file can be processed and run", {
 
 test_that("example file data preprocessing works correctly", {
   # Skip if the example file doesn't exist
-  example_file <- system.file("data", "example_cat.txt", package = "snp.slice")
+  example_file <- system.file("data", "example_cat.txt", package = "snp.slicer")
   skip_if_not(file.exists(example_file), "Example file not found")
   
   # Test the preprocessing function directly

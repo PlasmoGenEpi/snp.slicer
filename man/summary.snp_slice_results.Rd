@@ -4,10 +4,12 @@
 \alias{summary.snp_slice_results}
 \title{Print summary of SNP-Slice results}
 \usage{
-\method{summary}{snp_slice_results}(results)
+\method{summary}{snp_slice_results}(object, ...)
 }
 \arguments{
-\item{results}{SNP-Slice results object}
+\item{object}{SNP-Slice results object}
+
+\item{...}{Additional arguments}
 }
 \value{
 Summary information

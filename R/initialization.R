@@ -313,13 +313,4 @@ or_null <- function(x, default) {
   if (is.null(x)) default else x
 }
 
-#' Null coalescing operator (infix)
-#'
-#' @param x Value to check
-#' @param default Default value if x is NULL
-#'
-#' @return x if not NULL, otherwise default
-#' @keywords internal
-`%||%` <- function(x, default) {
-  if (is.null(x)) default else x
-}
+

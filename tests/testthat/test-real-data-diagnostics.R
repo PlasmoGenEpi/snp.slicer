@@ -312,7 +312,7 @@ test_that("performance monitoring works", {
 
 test_that("data loading functions work correctly", {
   # Test that we can load the example data
-  data(example_snp_data, package = "snp.slice")
+  data(example_snp_data, package = "snp.slicer")
   
   # Check structure
   expect_true(is.list(example_snp_data))

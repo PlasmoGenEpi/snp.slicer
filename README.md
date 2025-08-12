@@ -9,7 +9,7 @@ SNP-Slice is a Bayesian nonparametric method for resolving multi-strain infectio
 
 ```r
 # Install from GitHub (when available)
-devtools::install_github("m-murphy/snp.slice")
+devtools::install_github("plasmogenepi/snp.slice")
 ```
 
 ## Features

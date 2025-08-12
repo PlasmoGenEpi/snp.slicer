@@ -41,3 +41,7 @@ Desktop.ini
 # Backup files
 *.bak
 *.backup
+
+# Linter configuration
+.lintr
+docs

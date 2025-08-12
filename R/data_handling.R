@@ -1,3 +1,6 @@
+# Global variables for data loading
+utils::globalVariables("example_snp_data")
+
 #' Validate input data for SNP-Slice
 #'
 #' @param data Input data to validate
@@ -287,14 +290,15 @@ create_results_object <- function(mcmc_result, model_obj, processed_data) {
 #' result <- load_example_results()
 #' print(result)
 load_example_results <- function() {
-  results_file <- system.file("extdata", "example_analysis_results.rds", package = "snp.slice")
+  results_file <- system.file("extdata", "example_analysis_results.rds", package = "snp.slicer")
   
   if (!file.exists(results_file)) {
     warning("Example analysis results not found. Running analysis now (this may take a few minutes)...")
     
     # Load example data
-    data(example_snp_data, package = "snp.slice")
-    data <- list(read0 = example_snp_data$read0, read1 = example_snp_data$read1)
+    utils::data(example_snp_data, package = "snp.slicer", envir = environment())
+    example_data <- example_snp_data
+    data <- list(read0 = example_data$read0, read1 = example_data$read1)
     
     # Run analysis
     set.seed(123)
@@ -309,3 +313,34 @@ load_example_results <- function() {
   
   readRDS(results_file)
 }
+
+#' Example SNP Data
+#'
+#' Example SNP data for testing and demonstration purposes.
+#'
+#' @format A list containing:
+#' \describe{
+#'   \item{read0}{Matrix of reference allele read counts}
+#'   \item{read1}{Matrix of alternate allele read counts}
+#' }
+#' @source Simulated data for package testing
+#' @keywords datasets
+"example_snp_data"
+
+#' Example Read Count Data - Reference Alleles
+#'
+#' Example reference allele read count data for testing and demonstration purposes.
+#'
+#' @format A matrix of reference allele read counts with 200 hosts and 96 SNPs
+#' @source Simulated data for package testing
+#' @keywords datasets
+"example_read0"
+
+#' Example Read Count Data - Alternate Alleles
+#'
+#' Example alternate allele read count data for testing and demonstration purposes.
+#'
+#' @format A matrix of alternate allele read counts with 200 hosts and 96 SNPs
+#' @source Simulated data for package testing
+#' @keywords datasets
+"example_read1"

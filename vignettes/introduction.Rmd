@@ -34,10 +34,7 @@ This vignette demonstrates how to use SNP-Slice with the negative binomial model
 
 ```{r eval=FALSE}
 # Install from GitHub (when available)
-devtools::install_github("yourusername/snp-slice")
-
-# Or install locally
-devtools::install_local("path/to/snp.slice")
+devtools::install_github("plasmogenepi/snp.slicer")
 ```
 
 ## Basic Usage
@@ -45,7 +42,7 @@ devtools::install_local("path/to/snp.slice")
 ### Loading the Package
 
 ```{r}
-library(snp.slice)
+library(snp.slicer)
 ```
 
 ### Working with Example Data
@@ -54,7 +51,7 @@ SNP-Slice includes example read count data from a multi-strain infection study:
 
 ```{r}
 # Load the example data
-data(example_snp_data, package = "snp.slice")
+data(example_snp_data, package = "snp.slicer")
 
 # Extract the data
 read0 <- example_snp_data$read0

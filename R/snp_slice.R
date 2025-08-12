@@ -18,6 +18,7 @@
 #' @param gap Early stopping threshold. If NULL, runs for full n_mcmc iterations.
 #' @param seed Random seed for reproducibility.
 #' @param verbose Whether to print progress information (default: TRUE).
+#' @param log_performance Whether to log performance metrics (default: FALSE).
 #' @param store_mcmc Whether to store full MCMC samples (default: FALSE).
 #' @param ... Additional model-specific parameters.
 #'

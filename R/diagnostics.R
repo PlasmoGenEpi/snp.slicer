@@ -1,3 +1,6 @@
+# Global variables for data.frame column names
+utils::globalVariables(c("iteration", "logpost", "kstar", "n_strains"))
+
 #' Extract strain information from SNP-Slice results
 #'
 #' @param results SNP-Slice results object
@@ -65,8 +68,9 @@ plot_convergence <- function(results, type = "logpost") {
   
   if (type == "logpost") {
     logpost_values <- sapply(samples, function(s) s$logpost)
+    iterations <- 1:length(logpost_values)
     plot_data <- data.frame(
-      iteration = 1:length(logpost_values),
+      iteration = iterations,
       logpost = logpost_values
     )
     
@@ -85,8 +89,9 @@ plot_convergence <- function(results, type = "logpost") {
     }
   } else if (type == "kstar") {
     kstar_values <- sapply(samples, function(s) s$kstar)
+    iterations <- 1:length(kstar_values)
     plot_data <- data.frame(
-      iteration = 1:length(kstar_values),
+      iteration = iterations,
       kstar = kstar_values
     )
     
@@ -105,8 +110,9 @@ plot_convergence <- function(results, type = "logpost") {
     }
   } else if (type == "n_strains") {
     n_strains_values <- sapply(samples, function(s) sum(colSums(s$A) > 0))
+    iterations <- 1:length(n_strains_values)
     plot_data <- data.frame(
-      iteration = 1:length(n_strains_values),
+      iteration = iterations,
       n_strains = n_strains_values
     )
     
@@ -397,13 +403,14 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
 
 #' Print summary of SNP-Slice results
 #'
-#' @param results SNP-Slice results object
+#' @param object SNP-Slice results object
+#' @param ... Additional arguments
 #'
 #' @return Summary information
 #' @export
 #' @importFrom stats median
-summary.snp_slice_results <- function(results) {
-  if (!inherits(results, "snp_slice_results")) {
+summary.snp_slice_results <- function(object, ...) {
+  if (!inherits(object, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
   
@@ -411,17 +418,17 @@ summary.snp_slice_results <- function(results) {
   cat("========================\n\n")
   
   # Model information
-  cat("Model:", results$model_info$model, "\n")
-  cat("Data dimensions:", results$model_info$N, "hosts x", results$model_info$P, "SNPs\n")
-  cat("Data type:", results$model_info$data_type, "\n\n")
+  cat("Model:", object$model_info$model, "\n")
+  cat("Data dimensions:", object$model_info$N, "hosts x", object$model_info$P, "SNPs\n")
+  cat("Data type:", object$model_info$data_type, "\n\n")
   
   # Results summary
   cat("Results:\n")
-  cat("- Number of strains identified:", nrow(results$dictionary_matrix), "\n")
-  cat("- Number of hosts:", nrow(results$allocation_matrix), "\n")
+  cat("- Number of strains identified:", nrow(object$dictionary_matrix), "\n")
+  cat("- Number of hosts:", nrow(object$allocation_matrix), "\n")
   
   # Multiplicity of infection
-  moi <- rowSums(results$allocation_matrix)
+  moi <- rowSums(object$allocation_matrix)
   cat("- Multiplicity of infection (MOI):\n")
   cat("  - Mean MOI:", round(mean(moi), 2), "\n")
   cat("  - Median MOI:", round(stats::median(moi), 2), "\n")
@@ -434,18 +441,18 @@ summary.snp_slice_results <- function(results) {
   cat("  - Mixed infections:", mixed_infections, "(", round(100 * mixed_infections / length(moi), 1), "%)\n\n")
   
   # Convergence information
-  if (!is.null(results$convergence)) {
+  if (!is.null(object$convergence)) {
     cat("Convergence:\n")
-    cat("- Iterations run:", results$convergence$iterations_run, "\n")
-    cat("- Converged:", ifelse(results$convergence$converged, "Yes", "No"), "\n")
+    cat("- Iterations run:", object$convergence$iterations_run, "\n")
+    cat("- Converged:", ifelse(object$convergence$converged, "Yes", "No"), "\n")
   }
   
   # Diagnostics
-  if (!is.null(results$diagnostics)) {
-    cat("- Final log posterior:", round(results$diagnostics$final_logpost, 2), "\n")
-    cat("- MAP log posterior:", round(results$diagnostics$map_logpost, 2), "\n")
-    cat("- Final k*:", results$diagnostics$final_kstar, "\n")
-    cat("- MAP k*:", results$diagnostics$map_kstar, "\n")
+  if (!is.null(object$diagnostics)) {
+    cat("- Final log posterior:", round(object$diagnostics$final_logpost, 2), "\n")
+    cat("- MAP log posterior:", round(object$diagnostics$map_logpost, 2), "\n")
+    cat("- Final k*:", object$diagnostics$final_kstar, "\n")
+    cat("- MAP k*:", object$diagnostics$map_kstar, "\n")
   }
   
   cat("\n")
@@ -453,23 +460,24 @@ summary.snp_slice_results <- function(results) {
 
 #' Print SNP-Slice results
 #'
-#' @param results SNP-Slice results object
+#' @param x SNP-Slice results object
+#' @param ... Additional arguments
 #'
 #' @return Print information
 #' @export
-print.snp_slice_results <- function(results) {
-  if (!inherits(results, "snp_slice_results")) {
+print.snp_slice_results <- function(x, ...) {
+  if (!inherits(x, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
   
   cat("SNP-Slice Results\n")
   cat("================\n")
-  cat("Model:", results$model_info$model, "\n")
-  cat("Dimensions:", nrow(results$allocation_matrix), "hosts x", ncol(results$dictionary_matrix), "strains x", ncol(results$dictionary_matrix), "SNPs\n")
-  cat("Strains identified:", nrow(results$dictionary_matrix), "\n")
+  cat("Model:", x$model_info$model, "\n")
+  cat("Dimensions:", nrow(x$allocation_matrix), "hosts x", ncol(x$dictionary_matrix), "strains x", ncol(x$dictionary_matrix), "SNPs\n")
+  cat("Strains identified:", nrow(x$dictionary_matrix), "\n")
   
-  if (!is.null(results$convergence)) {
-    cat("Converged:", ifelse(results$convergence$converged, "Yes", "No"), "\n")
+  if (!is.null(x$convergence)) {
+    cat("Converged:", ifelse(x$convergence$converged, "Yes", "No"), "\n")
   }
   
   cat("\n")

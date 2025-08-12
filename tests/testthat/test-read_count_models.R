@@ -1,7 +1,7 @@
 test_that("read count data files can be loaded and processed", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -28,8 +28,8 @@ test_that("read count data files can be loaded and processed", {
 
 test_that("Poisson model works with read count data", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -79,8 +79,8 @@ test_that("Poisson model works with read count data", {
 
 test_that("Negative Binomial model works with read count data", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -131,8 +131,8 @@ test_that("Negative Binomial model works with read count data", {
 
 test_that("Binomial model works with read count models", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -183,8 +183,8 @@ test_that("Binomial model works with read count models", {
 
 test_that("read count data preprocessing works correctly", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -236,8 +236,8 @@ test_that("read count data preprocessing works correctly", {
 
 test_that("read count models converge and produce reasonable results", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   
@@ -294,8 +294,8 @@ test_that("read count models converge and produce reasonable results", {
 
 test_that("read count models handle different parameter settings", {
   # Skip if the example files don't exist
-  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slice")
-  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slice")
+  read1_file <- system.file("data", "example_read1_no_host.txt", package = "snp.slicer")
+  read0_file <- system.file("data", "example_read0_no_host.txt", package = "snp.slicer")
   skip_if_not(file.exists(read1_file), "Read1 file not found")
   skip_if_not(file.exists(read0_file), "Read0 file not found")
   

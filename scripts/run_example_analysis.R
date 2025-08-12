@@ -3,7 +3,7 @@
 # Script to run SNP-Slice analysis on example data and save results
 # This script runs once and saves the results for use in the vignette
 
-library(snp.slice)
+library(snp.slicer)
 
 # Load the example data directly from files
 read0_file <- "data/example_read0_no_host.txt"
@@ -30,7 +30,7 @@ cat("This may take a few minutes...\n")
 set.seed(123)  # For reproducibility
 result <- snp_slice(data, 
                    model = "negative_binomial",
-                   n_mcmc = 200,
+                   n_mcmc = 2000,
                    store_mcmc = TRUE,
                    verbose = TRUE)
 

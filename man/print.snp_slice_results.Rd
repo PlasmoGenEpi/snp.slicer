@@ -4,10 +4,12 @@
 \alias{print.snp_slice_results}
 \title{Print SNP-Slice results}
 \usage{
-\method{print}{snp_slice_results}(results)
+\method{print}{snp_slice_results}(x, ...)
 }
 \arguments{
-\item{results}{SNP-Slice results object}
+\item{x}{SNP-Slice results object}
+
+\item{...}{Additional arguments}
 }
 \value{
 Print information

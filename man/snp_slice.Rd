@@ -56,6 +56,8 @@ should be a matrix with values 0, 0.5, or 1.}
 
 \item{verbose}{Whether to print progress information (default: TRUE).}
 
+\item{log_performance}{Whether to log performance metrics (default: FALSE).}
+
 \item{store_mcmc}{Whether to store full MCMC samples (default: FALSE).}
 
 \item{...}{Additional model-specific parameters.}
