@@ -417,7 +417,7 @@ summary.snp_slice_results <- function(object, ...) {
   
   # Model information
   cat("Model:", object$model_info$model, "\n")
-  cat("Data dimensions:", object$model_info$N, "hosts x", object$model_info$P, "SNPs\n")
+  cat("Data dimensions:", object$model_info$processed_data$N, "hosts x", object$model_info$processed_data$P, "SNPs\n")
   cat("Data type:", object$model_info$data_type, "\n\n")
   
   # Results summary
