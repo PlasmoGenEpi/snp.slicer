@@ -39,8 +39,6 @@ extract_allocations <- function(results) {
     allocation_matrix = results$allocation_matrix,
     n_hosts = nrow(results$allocation_matrix),
     n_strains = ncol(results$allocation_matrix),
-    host_names = paste0("Host_", 1:nrow(results$allocation_matrix)),
-    strain_names = paste0("Strain_", 1:ncol(results$allocation_matrix)),
     multiplicity_of_infection = rowSums(results$allocation_matrix)
   )
   
@@ -444,7 +442,7 @@ summary.snp_slice_results <- function(object, ...) {
   if (!is.null(object$convergence)) {
     cat("Convergence:\n")
     cat("- Iterations run:", object$convergence$iterations_run, "\n")
-    cat("- Converged:", ifelse(object$convergence$converged, "Yes", "No"), "\n")
+    cat("- Gap Converged:", ifelse(object$convergence$gap_converged, "Yes", "No"), "\n")
   }
   
   # Diagnostics
@@ -477,7 +475,7 @@ print.snp_slice_results <- function(x, ...) {
   cat("Strains identified:", nrow(x$dictionary_matrix), "\n")
   
   if (!is.null(x$convergence)) {
-    cat("Converged:", ifelse(x$convergence$converged, "Yes", "No"), "\n")
+    cat("Gap Converged:", ifelse(x$convergence$gap_converged, "Yes", "No"), "\n")
   }
   
   cat("\n")

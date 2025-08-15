@@ -56,7 +56,7 @@ test_that("summary.snp_slice_results works", {
     allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
     dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3, data_type = "read_counts"),
-    convergence = list(converged = TRUE, iterations_run = 100),
+    convergence = list(gap_converged = TRUE, iterations_run = 100),
     diagnostics = list(
       final_logpost = -10.5,
       map_logpost = -9.8,
@@ -83,7 +83,7 @@ test_that("print.snp_slice_results works", {
     allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
     dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3),
-    convergence = list(converged = TRUE, iterations_run = 100)
+    convergence = list(gap_converged = TRUE, iterations_run = 100)
   )
   class(test_result) <- "snp_slice_results"
   

@@ -4,7 +4,7 @@
 \alias{preprocess_data}
 \title{Preprocess data for SNP-Slice}
 \usage{
-preprocess_data(data, model)
+preprocess_data(data, model, ...)
 }
 \arguments{
 \item{data}{Input data}

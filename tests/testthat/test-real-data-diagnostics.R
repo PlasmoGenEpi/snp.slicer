@@ -265,8 +265,8 @@ test_that("convergence information is available", {
     conv <- result$convergence
     expect_true(is.list(conv))
     
-    if ("converged" %in% names(conv)) {
-      expect_true(is.logical(conv$converged))
+    if ("gap_converged" %in% names(conv)) {
+      expect_true(is.logical(conv$gap_converged))
     }
     
     if ("iterations_run" %in% names(conv)) {

@@ -196,7 +196,7 @@ run_mcmc <- function(model_obj, n_mcmc, burnin, gap, verbose, store_mcmc) {
       store_mcmc = store_mcmc
     ),
     convergence = list(
-      converged = !is.null(gap) && mapiter < iter - gap,
+      gap_converged = !is.null(gap) && mapiter < iter - gap,
       iterations_run = iter
     )
   )
@@ -280,6 +280,7 @@ get_m <- function(A) {
 #' @keywords internal
 remove_duplicates <- function(dd) {
   # Calculate pairwise distances
+  rownames(dd) <- NULL
   metric <- 1 - (dd %*% t(dd) + (1 - dd) %*% t(1 - dd)) / ncol(dd)
   
   # Find unique patterns

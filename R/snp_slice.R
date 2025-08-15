@@ -68,7 +68,6 @@ snp_slice <- function(data,
   }
 
   # Validate inputs
-  validate_input_data(data, model)
   validate_parameters(alpha, rho, threshold)
   validate_mcmc_settings(n_mcmc, burnin, gap)
 
@@ -78,7 +77,7 @@ snp_slice <- function(data,
   }
 
   # Preprocess data
-  processed_data <- preprocess_data(data, model)
+  processed_data <- preprocess_data(data, model, ...)
 
   # Create model object
   model_obj <- create_model(model, processed_data, alpha = alpha, rho = rho, ...)
@@ -105,7 +104,6 @@ snp_slice <- function(data,
   if (verbose) {
     cat("Analysis complete\n")
     if (log_performance) {
-      cat("Performance Summary:\n")
       print_performance_summary()
     }
   }
