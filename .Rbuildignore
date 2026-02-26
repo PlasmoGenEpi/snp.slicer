@@ -6,8 +6,9 @@
 ^data/example_cat\.txt$
 ^data/example_read0_no_host\.txt$
 ^data/example_read1_no_host\.txt$
+^\.\.Rcheck$
 ^\.lintr$
-^LICENSE$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
+Makefile
