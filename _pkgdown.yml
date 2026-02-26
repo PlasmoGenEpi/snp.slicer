@@ -1,4 +1,5 @@
-url: ~
+# pkgdown config; logo is auto-detected from man/figures/logo.png
+url: https://github.com/plasmogenepi/snp.slicer
+
 template:
   bootstrap: 5
-

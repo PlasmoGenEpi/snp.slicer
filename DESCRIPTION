@@ -32,9 +32,10 @@ Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    ggplot2
+    ggplot2,
+    pkgdown
 VignetteBuilder: knitr
 URL: https://github.com/plasmogenepi/snp.slicer
 BugReports: https://github.com/plasmogenepi/snp.slicer/issues
 Depends: 
-    R (>= 4.1.0)
+    R (>= 4.2.0)
