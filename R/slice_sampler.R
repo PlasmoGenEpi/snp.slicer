@@ -80,14 +80,31 @@ slice_update_s <- function(state, model_obj) {
 #' @keywords internal
 slice_update_a <- function(state, model_obj) {
   start_timer("slice_update_a")
-  
-  for (k in 1:state$kplus) {
-    for (i in state$mixed) {
-      state <- slice_update_a_local(state, i, k, model_obj)
+
+  kstar <- state$kstar
+
+  for (i in state$mixed) {
+    full_row_i <- state$A[i, , drop = FALSE] %*% state$D
+    row_sum_i <- sum(state$A[i, ])
+    for (k in 1:state$kplus) {
+      old_A_ik <- state$A[i, k]
+      state <- slice_update_a_local(state, i, k, model_obj,
+        full_row_i = full_row_i, row_sum_i = row_sum_i, kstar = kstar)
+      if (state$A[i, k] != old_A_ik) {
+        delta <- state$A[i, k] - old_A_ik
+        full_row_i <- full_row_i + delta * state$D[k, ]
+        row_sum_i <- row_sum_i + delta
+        if (state$A[i, k] == 1L) {
+          kstar <- max(kstar, k)
+        } else if (k == kstar && sum(state$A[, k]) == 0) {
+          active <- which(colSums(state$A) > 0)
+          kstar <- if (length(active) == 0) 0 else max(active)
+        }
+      }
     }
   }
-  state$kstar <- get_kstar(state$A)
-  
+  state$kstar <- kstar
+
   end_timer("slice_update_a")
   return(state)
 }
@@ -98,51 +115,60 @@ slice_update_a <- function(state, model_obj) {
 #' @param i Host index
 #' @param k Strain index
 #' @param model_obj Model object
+#' @param full_row_i Optional precomputed row contribution \code{A[i,]} %*% D (from slice_update_a)
+#' @param row_sum_i Optional precomputed sum of \code{A[i,]} (from slice_update_a)
+#' @param kstar Optional current last-active-feature index (from slice_update_a)
 #'
 #' @return Updated state
 #' @keywords internal
 #' @importFrom stats runif
-slice_update_a_local <- function(state, i, k, model_obj) {
+slice_update_a_local <- function(state, i, k, model_obj,
+                                 full_row_i = NULL, row_sum_i = NULL, kstar = NULL) {
   start_timer("slice_update_a_local")
-  
-  # Calculate current allocation excluding strain k
-  ad0 <- state$A[i, -k, drop = FALSE] %*% state$D[-k, , drop = FALSE]
-  a0 <- sum(state$A[i, -k])
-  
+
+  if (is.null(full_row_i) || is.null(row_sum_i)) {
+    ad0 <- state$A[i, -k, drop = FALSE] %*% state$D[-k, , drop = FALSE]
+    a0 <- sum(state$A[i, -k])
+  } else {
+    ad0 <- full_row_i - state$A[i, k] * state$D[k, ]
+    a0 <- row_sum_i - state$A[i, k]
+  }
+  if (is.null(kstar)) {
+    kstar <- state$kstar
+  }
+
   if (a0 == 0) {
     state$A[i, k] <- 1
-    state$kstar <- get_kstar(state$A)
     return(state)
   }
-  
+
   # Calculate log probabilities
-  logp0 <- model_obj$loglikelihood_vector(as.vector(ad0 / a0), 
+  logp0 <- model_obj$loglikelihood_vector(as.vector(ad0 / a0),
                                          as.vector(model_obj$y[i, ]),
                                          as.vector(model_obj$r[i, ]))
   logp1 <- model_obj$loglikelihood_vector(as.vector((ad0 + state$D[k, ]) / (a0 + 1)),
                                          as.vector(model_obj$y[i, ]),
                                          as.vector(model_obj$r[i, ]))
-  
+
   # Add prior contributions
   logp0 <- logp0 + log(1 - state$mu[k])
   logp1 <- logp1 + log(state$mu[k])
-  
-  # Handle special cases for kstar changes
-  if (k == state$kstar && state$A[i, k] == 1 && sum(state$A[-i, k]) == 0) {
+
+  # Handle special cases for kstar changes (use passed-in kstar)
+  if (k == kstar && state$A[i, k] == 1 && sum(state$A[-i, k]) == 0) {
     logp1 <- logp1 - log(state$mu[k])
     next_kstar <- tail(which(colSums(state$A) != 0), 2)[1]
     logp0 <- logp0 - log(state$mu[next_kstar])
-  } else if (k > state$kstar) {
+  } else if (k > kstar) {
     logp1 <- logp1 - log(state$mu[k])
-    logp0 <- logp0 - log(state$mu[state$kstar])
+    logp0 <- logp0 - log(state$mu[kstar])
   }
-  
+
   # Metropolis-Hastings acceptance
   p1 <- get_mhratio(logp1, logp0)
   u <- stats::runif(1)
   state$A[i, k] <- (u < p1)
-  state$kstar <- get_kstar(state$A)
-  
+
   end_timer("slice_update_a_local")
   return(state)
 }
@@ -156,13 +182,18 @@ slice_update_a_local <- function(state, i, k, model_obj) {
 #' @keywords internal
 slice_update_d <- function(state, model_obj) {
   start_timer("slice_update_d")
-  
+
+  # Row sums of A are unchanged during D updates; compute once
+  an <- rowSums(state$A)
+
   for (k in state$kmin:state$kstar) {
+    # Leave-k-out product: one matrix multiply per k instead of P per k
+    M_k <- state$A[, -k, drop = FALSE] %*% state$D[-k, , drop = FALSE]
     for (p in 1:model_obj$P) {
-      state <- slice_update_d_local(state, k, p, model_obj)
+      state <- slice_update_d_local(state, k, p, model_obj, an = an, ad0 = M_k[, p])
     }
   }
-  
+
   end_timer("slice_update_d")
   return(state)
 }
@@ -173,34 +204,39 @@ slice_update_d <- function(state, model_obj) {
 #' @param k Strain index
 #' @param p SNP index
 #' @param model_obj Model object
+#' @param an Optional precomputed row sums of A (from slice_update_d)
+#' @param ad0 Optional precomputed leave-k-out contribution for this (k,p)
 #'
 #' @return Updated state
 #' @keywords internal
 #' @importFrom stats runif
-slice_update_d_local <- function(state, k, p, model_obj) {
+slice_update_d_local <- function(state, k, p, model_obj, an = NULL, ad0 = NULL) {
   start_timer("slice_update_d_local")
-  
-  # Calculate current dictionary contribution excluding strain k
-  ad0 <- state$A[, -k, drop = FALSE] %*% state$D[-k, p, drop = FALSE]
-  an <- rowSums(state$A)
-  
+
+  if (is.null(an)) {
+    an <- rowSums(state$A)
+  }
+  if (is.null(ad0)) {
+    ad0 <- state$A[, -k, drop = FALSE] %*% state$D[-k, p, drop = FALSE]
+  }
+
   # Prior probabilities
   logp1 <- log(model_obj$rho)
   logp0 <- log(1 - model_obj$rho)
-  
+
   # Likelihood contributions
-  logp1 <- logp1 + model_obj$loglikelihood_vector((ad0 + state$A[, k]) / an, 
-                                                 model_obj$y[, p], 
+  logp1 <- logp1 + model_obj$loglikelihood_vector((ad0 + state$A[, k]) / an,
+                                                 model_obj$y[, p],
                                                  model_obj$r[, p])
-  logp0 <- logp0 + model_obj$loglikelihood_vector(ad0 / an, 
-                                                 model_obj$y[, p], 
+  logp0 <- logp0 + model_obj$loglikelihood_vector(ad0 / an,
+                                                 model_obj$y[, p],
                                                  model_obj$r[, p])
-  
+
   # Metropolis-Hastings acceptance
   p1 <- get_mhratio(logp1, logp0)
   u <- stats::runif(1)
   state$D[k, p] <- (u < p1)
-  
+
   end_timer("slice_update_d_local")
   return(state)
 }

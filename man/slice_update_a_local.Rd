@@ -4,7 +4,15 @@
 \alias{slice_update_a_local}
 \title{Update single element of allocation matrix A}
 \usage{
-slice_update_a_local(state, i, k, model_obj)
+slice_update_a_local(
+  state,
+  i,
+  k,
+  model_obj,
+  full_row_i = NULL,
+  row_sum_i = NULL,
+  kstar = NULL
+)
 }
 \arguments{
 \item{state}{Current state}
@@ -14,6 +22,12 @@ slice_update_a_local(state, i, k, model_obj)
 \item{k}{Strain index}
 
 \item{model_obj}{Model object}
+
+\item{full_row_i}{Optional precomputed row contribution \code{A[i,]} \%*\% D (from slice_update_a)}
+
+\item{row_sum_i}{Optional precomputed sum of \code{A[i,]} (from slice_update_a)}
+
+\item{kstar}{Optional current last-active-feature index (from slice_update_a)}
 }
 \value{
 Updated state

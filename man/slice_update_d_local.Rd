@@ -4,7 +4,7 @@
 \alias{slice_update_d_local}
 \title{Update single element of dictionary matrix D}
 \usage{
-slice_update_d_local(state, k, p, model_obj)
+slice_update_d_local(state, k, p, model_obj, an = NULL, ad0 = NULL)
 }
 \arguments{
 \item{state}{Current state}
@@ -14,6 +14,10 @@ slice_update_d_local(state, k, p, model_obj)
 \item{p}{SNP index}
 
 \item{model_obj}{Model object}
+
+\item{an}{Optional precomputed row sums of A (from slice_update_d)}
+
+\item{ad0}{Optional precomputed leave-k-out contribution for this (k,p)}
 }
 \value{
 Updated state
