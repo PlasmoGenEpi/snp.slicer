@@ -1,5 +1,9 @@
-# Global variables for data loading
-utils::globalVariables("example_snp_data")
+# Global variables for data loading and dplyr/tidyr NSE
+utils::globalVariables(c(
+  "example_snp_data",
+  "target_id", "target_value", "specimen_id", "target_count",
+  "total_count", "target_idx"
+))
 
 #' Validate input data for SNP-Slice
 #'
@@ -280,8 +284,8 @@ preprocess_data <- function(data, model, ...) {
       return(list(
         y = data,
         r = NULL,
-        N = nrow(y),
-        P = ncol(y),
+        N = nrow(data),
+        P = ncol(data),
         data_type = "categorical",
         model = model,
         target_ids = colnames(data),
@@ -326,6 +330,11 @@ preprocess_data <- function(data, model, ...) {
   }
 
   if (is.character(data)) {
+    # Categorical files (e.g. example_cat.txt) are wide: host_id, strain_id, site_1..site_N
+    if (model == "categorical" || grepl("_cat\\.txt$", data)) {
+      mat <- read_snp_data(data, format = "categorical")
+      return(preprocess_data(mat, model, ...))
+    }
     df <- readr::read_tsv(data)
     return(load_dataframe(df, model, ...))
   }
@@ -405,6 +414,7 @@ create_results_object <- function(mcmc_result, model_obj, processed_data) {
     parameters = mcmc_result$parameters,
     model_info = list(
       model = model_obj$name,
+      data_type = processed_data$data_type,
       processed_data = processed_data
     ),
     convergence = mcmc_result$convergence
@@ -418,7 +428,7 @@ create_results_object <- function(mcmc_result, model_obj, processed_data) {
 #' Load Example Analysis Results
 #'
 #' Loads pre-computed SNP-Slice analysis results from the example data.
-#' These results were generated using the negative binomial model with 200 MCMC iterations.
+#' These results were generated using the negative binomial model with 2000 MCMC iterations.
 #'
 #' @return A \code{snp_slice_results} object containing the analysis results
 #' @export
@@ -441,7 +451,7 @@ load_example_results <- function() {
     set.seed(123)
     result <- snp_slice(data, 
                        model = "negative_binomial",
-                       n_mcmc = 200,
+                       n_mcmc = 2000,
                        store_mcmc = TRUE,
                        verbose = FALSE)
     
@@ -596,6 +606,54 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
   result_df <- result_df[order(result_df$frequency, decreasing = TRUE), ]
   
   return(result_df)
+}
+
+#' Calculate allele frequencies for multiple target sets
+#'
+#' For each target set, computes allele frequencies from MCMC/MAP results and
+#' returns a list of frequency tables (one per set). Each set is a vector of
+#' target indices or target names.
+#'
+#' @param results A \code{snp_slice_results} object containing MCMC results.
+#' @param target_sets List of vectors; each element is target indices (integer)
+#'   or target names (character) defining one set. If the list is named, those
+#'   names are used for the returned list.
+#' @param use_map Logical; use MAP estimates (TRUE) or sample from MCMC (FALSE).
+#' @param n_samples Number of MCMC samples to use if \code{use_map = FALSE} (default: 100).
+#' @param allele_sep Separator for allele strings (default: "|").
+#'
+#' @return A named list of data frames. Each data frame has columns
+#'   \code{allele}, \code{frequency}, \code{count}, \code{total_parasites}.
+#'   Names are from \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc.
+#'
+#' @export
+#' @examples
+#' result <- load_example_results()
+#' target_sets <- list(locus_a = c(1, 5), locus_b = c(10))
+#' freqs <- calculate_allele_frequencies_by_sets(result, target_sets)
+#' print(freqs$locus_a)
+calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map = TRUE, n_samples = 100, allele_sep = "|") {
+  if (!is.list(target_sets)) {
+    stop("target_sets must be a list")
+  }
+  if (length(target_sets) == 0) {
+    stop("target_sets must contain at least one set")
+  }
+  for (i in seq_along(target_sets)) {
+    set <- target_sets[[i]]
+    if (!is.vector(set) || length(set) == 0) {
+      stop("Each element of target_sets must be a non-empty vector of indices or target names")
+    }
+  }
+  out <- lapply(target_sets, function(set) {
+    calculate_allele_frequencies(results, snp_indices = set, use_map = use_map, n_samples = n_samples, allele_sep = allele_sep)
+  })
+  if (!is.null(names(target_sets))) {
+    names(out) <- names(target_sets)
+  } else {
+    names(out) <- paste0("set_", seq_along(target_sets))
+  }
+  out
 }
 
 #' Calculate allele counts for a single sample

@@ -76,6 +76,9 @@ snp_slice <- function(data,
     burnin <- floor(n_mcmc / 2)
   }
 
+  # Validate input data before preprocessing
+  validate_input_data(data, model)
+
   # Preprocess data
   processed_data <- preprocess_data(data, model, ...)
 
