@@ -44,6 +44,75 @@ test_that("extract_allocations works correctly", {
   expect_equal(allocations$multiplicity_of_infection, c(2, 1))
 })
 
+test_that("calculate_individual_coi with use_map = TRUE (MAP only)", {
+  A <- matrix(c(1, 1, 1, 0, 0, 1), nrow = 3, ncol = 2, byrow = TRUE)
+  test_result <- list(
+    allocation_matrix = A,
+    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL))
+  )
+  class(test_result) <- "snp_slice_results"
+
+  coi <- calculate_individual_coi(test_result, use_map = TRUE)
+
+  expect_equal(nrow(coi), 3)
+  expect_equal(coi$host_index, 1:3)
+  expect_equal(coi$coi_estimate, c(2, 1, 1))
+  expect_true(all(is.na(coi$coi_sd)))
+  expect_true(all(is.na(coi$coi_lower)))
+  expect_true(all(is.na(coi$coi_upper)))
+})
+
+test_that("calculate_individual_coi with MCMC samples (use_map = FALSE)", {
+  A <- matrix(c(1, 0, 1, 1), nrow = 2, ncol = 2)
+  test_result <- list(
+    allocation_matrix = A,
+    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL)),
+    mcmc_samples = list(
+      list(A = A), list(A = A), list(A = A), list(A = A), list(A = A)
+    ),
+    parameters = list(burnin = 1)
+  )
+  class(test_result) <- "snp_slice_results"
+
+  coi <- calculate_individual_coi(test_result, use_map = FALSE, n_samples = 4, interval = 0.95)
+
+  expect_equal(nrow(coi), 2)
+  expect_equal(coi$coi_estimate, c(2, 1))
+  expect_equal(coi$coi_sd, c(0, 0))
+  expect_equal(coi$coi_lower, c(2, 1))
+  expect_equal(coi$coi_upper, c(2, 1))
+})
+
+test_that("calculate_individual_coi errors when use_map = FALSE and no MCMC samples", {
+  test_result <- list(
+    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL))
+  )
+  class(test_result) <- "snp_slice_results"
+
+  expect_error(
+    calculate_individual_coi(test_result, use_map = FALSE),
+    "MCMC samples not available"
+  )
+})
+
+test_that("calculate_individual_coi validates input", {
+  test_result <- list(
+    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL))
+  )
+  class(test_result) <- "snp_slice_results"
+
+  expect_error(calculate_individual_coi(list()), "results must be an snp_slice_results object")
+  expect_error(calculate_individual_coi(test_result, use_map = "yes"), "use_map must be a single logical")
+  expect_error(calculate_individual_coi(test_result, n_samples = 0), "n_samples must be a positive integer")
+  expect_error(calculate_individual_coi(test_result, interval = 1), "interval must be a number between 0 and 1")
+})
+
 test_that("extract functions validate input", {
   # Test with non-snp_slice_results object
   expect_error(extract_strains(list()), "Input must be an snp_slice_results object")

@@ -35,14 +35,136 @@ extract_allocations <- function(results) {
   }
   
   # Extract allocation information
+  n_hosts <- nrow(results$allocation_matrix)
+  n_strains <- ncol(results$allocation_matrix)
   allocations <- list(
     allocation_matrix = results$allocation_matrix,
-    n_hosts = nrow(results$allocation_matrix),
-    n_strains = ncol(results$allocation_matrix),
+    n_hosts = n_hosts,
+    n_strains = n_strains,
+    host_names = paste0("Host_", seq_len(n_hosts)),
+    strain_names = paste0("Strain_", seq_len(n_strains)),
     multiplicity_of_infection = rowSums(results$allocation_matrix)
   )
   
   return(allocations)
+}
+
+#' Calculate estimated individual COI with uncertainty
+#'
+#' @description
+#' Returns per-host complexity of infection (COI). With \code{use_map = TRUE}
+#' you get a point estimate (MAP); with \code{use_map = FALSE} and MCMC samples,
+#' posterior mean, SD, and credible interval are computed.
+#'
+#' @param results A \code{snp_slice_results} object.
+#' @param use_map If \code{TRUE} (default), use MAP only; uncertainty columns
+#'   are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.
+#' @param n_samples When \code{use_map = FALSE}, number of MCMC samples to use
+#'   (capped at available post-burnin samples).
+#' @param interval Numeric in (0, 1). Credible interval width when using MCMC
+#'   (e.g. 0.95 for 2.5 and 97.5 percent quantiles).
+#'
+#' @return A data frame with one row per host: host_index, host_id, coi_estimate,
+#'   coi_sd, coi_lower, coi_upper. Uncertainty columns are NA when using MAP or
+#'   when no MCMC samples are available.
+#'
+#' @export
+#' @examples
+#' result <- load_example_results()
+#' coi_map <- calculate_individual_coi(result, use_map = TRUE)
+#' head(coi_map)
+#' if (!is.null(result$mcmc_samples)) {
+#'   coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50)
+#'   head(coi_post)
+#' }
+calculate_individual_coi <- function(results,
+                                    use_map = TRUE,
+                                    n_samples = 100,
+                                    interval = 0.95) {
+  if (!inherits(results, "snp_slice_results")) {
+    stop("results must be an snp_slice_results object")
+  }
+  if (!is.logical(use_map) || length(use_map) != 1) {
+    stop("use_map must be a single logical value")
+  }
+  if (!is.numeric(n_samples) || n_samples < 1) {
+    stop("n_samples must be a positive integer")
+  }
+  if (!is.numeric(interval) || interval <= 0 || interval >= 1) {
+    stop("interval must be a number between 0 and 1 (exclusive)")
+  }
+
+  A <- results$allocation_matrix
+  n_hosts <- nrow(A)
+
+  host_id <- NA_character_
+  if (!is.null(results$model_info$processed_data$specimen_ids)) {
+    sid <- results$model_info$processed_data$specimen_ids
+    if (length(sid) == n_hosts) {
+      host_id <- sid
+    }
+  }
+  if (length(host_id) == 1L && is.na(host_id)) {
+    host_id <- rep(NA_character_, n_hosts)
+  }
+
+  if (use_map) {
+    coi_estimate <- rowSums(A)
+    out <- data.frame(
+      host_index = seq_len(n_hosts),
+      host_id = host_id,
+      coi_estimate = as.integer(coi_estimate),
+      coi_sd = NA_real_,
+      coi_lower = NA_real_,
+      coi_upper = NA_real_,
+      stringsAsFactors = FALSE
+    )
+    return(out)
+  }
+
+  if (is.null(results$mcmc_samples)) {
+    stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
+  }
+
+  burnin <- results$parameters$burnin
+  if (!is.numeric(burnin) || burnin < 0) {
+    burnin <- 0
+  }
+  burnin <- as.integer(burnin)
+  all_idx <- seq_along(results$mcmc_samples)
+  post_burnin_idx <- all_idx[all_idx > burnin]
+  n_avail <- length(post_burnin_idx)
+
+  if (n_avail == 0) {
+    stop("No post-burnin MCMC samples available (burnin = ", burnin, ", total samples = ", length(all_idx), ")")
+  }
+
+  if (n_samples > n_avail) {
+    warning("Requested ", n_samples, " samples but only ", n_avail, " post-burnin available. Using all post-burnin samples.")
+    n_samples <- n_avail
+  }
+
+  sample_indices <- post_burnin_idx[sample.int(n_avail, n_samples, replace = FALSE)]
+
+  coi_matrix <- vapply(sample_indices, function(i) {
+    rowSums(results$mcmc_samples[[i]]$A)
+  }, FUN.VALUE = numeric(n_hosts))
+
+  probs <- c((1 - interval) / 2, 1 - (1 - interval) / 2)
+  coi_estimate <- rowMeans(coi_matrix)
+  coi_sd <- apply(coi_matrix, 1L, stats::sd)
+  coi_lower <- apply(coi_matrix, 1L, stats::quantile, probs = probs[1], names = FALSE)
+  coi_upper <- apply(coi_matrix, 1L, stats::quantile, probs = probs[2], names = FALSE)
+
+  data.frame(
+    host_index = seq_len(n_hosts),
+    host_id = host_id,
+    coi_estimate = coi_estimate,
+    coi_sd = coi_sd,
+    coi_lower = coi_lower,
+    coi_upper = coi_upper,
+    stringsAsFactors = FALSE
+  )
 }
 
 #' Plot convergence diagnostics
@@ -416,9 +538,14 @@ summary.snp_slice_results <- function(object, ...) {
   cat("========================\n\n")
   
   # Model information
+  pd <- object$model_info$processed_data
+  N <- if (!is.null(pd$N)) pd$N else object$model_info$N
+  P <- if (!is.null(pd$P)) pd$P else object$model_info$P
   cat("Model:", object$model_info$model, "\n")
-  cat("Data dimensions:", object$model_info$processed_data$N, "hosts x", object$model_info$processed_data$P, "SNPs\n")
-  cat("Data type:", object$model_info$data_type, "\n\n")
+  cat("Data dimensions:", N, "hosts x", P, "SNPs\n")
+  data_type <- object$model_info$data_type
+  if (is.null(data_type)) data_type <- object$model_info$model
+  cat("Data type:", data_type, "\n\n")
   
   # Results summary
   cat("Results:\n")
