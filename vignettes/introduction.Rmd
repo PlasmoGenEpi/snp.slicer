@@ -1,7 +1,6 @@
 ---
 title: "Introduction to SNP-Slice"
 author: "Maxwell Murphy"
-date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Introduction to SNP-Slice}
@@ -22,6 +21,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 ```
+
 ## Overview
 
 SNP-Slice is a Bayesian nonparametric method for resolving multi-strain infections using slice sampling with stick-breaking construction. The algorithm simultaneously unveils strain haplotypes and links them to hosts from sequencing data.
@@ -160,7 +160,7 @@ result_tuned <- snp_slice(data,
 
 When you store MCMC samples (`store_mcmc = TRUE`), you can assess convergence with effective sample size (ESS) and trace plots:
 
-```{r}
+```{r, fig.alt = "Trace plot of log posterior over MCMC iterations."}
 if (!is.null(result$mcmc_samples)) {
   # Effective sample size for log posterior
   ess_logpost <- effective_sample_size(result, parameter = "logpost")
@@ -182,7 +182,7 @@ Let's create some informative plots to better understand the analysis results:
 
 ### Multiplicity of Infection (MOI) Distribution
 
-```{r}
+```{r, fig.alt = "Histogram of multiplicity of infection (number of strains per host) with mean indicated by a vertical line."}
 # Get MOI from allocations (same as strain diversity)
 allocations <- extract_allocations(result)
 moi_df <- data.frame(
@@ -211,7 +211,7 @@ ggplot(moi_df, aes(x = moi)) +
 
 ### Strain Frequency Analysis
 
-```{r}
+```{r, fig.alt = "Bar chart of strain frequencies across hosts (number of hosts infected per strain)."}
 # Calculate strain frequencies
 strain_frequencies <- colSums(A)
 freq_df <- data.frame(
@@ -241,7 +241,7 @@ ggplot(freq_df, aes(x = reorder(strain_id, frequency), y = frequency)) +
 
 ### Strain Pattern Heatmap
 
-```{r}
+```{r, fig.alt = "Heatmap of strain genotypes: rows are strains, columns are SNPs; white is reference allele, blue is alternative."}
 # Create a heatmap of the first 20 strains and first 30 SNPs
 D_subset <- D[1:min(20, nrow(D)), 1:min(30, ncol(D))]
 
@@ -275,7 +275,7 @@ ggplot(heatmap_data, aes(x = snp, y = strain, fill = factor(value))) +
 
 ### Host-Strain Allocation Heatmap
 
-```{r}
+```{r, fig.alt = "Heatmap of host-strain allocation weights: rows are hosts, columns are strains; color indicates allocation strength."}
 # Create a heatmap of host-strain allocations (first 50 hosts, first 20 strains)
 A_subset <- A[1:min(50, nrow(A)), 1:min(20, ncol(A))]
 
