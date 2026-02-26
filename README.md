@@ -1,4 +1,5 @@
 # SNP-Slice: Bayesian Nonparametric Resolution of Multi-Strain Infections
+
 This library provides an installable implementation of the original `snp-slice` [model](https://github.com/nianqiaoju/snp-slice). We have no affiliation with this author and provide this implementation as is.
 
 ## Overview
@@ -22,32 +23,7 @@ install.packages(
 - **Convergence Diagnostics**: Built-in monitoring and early stopping
 - **Comprehensive Results**: Returns allocation matrix, dictionary matrix, and diagnostics
 
-## Documentation
 
-- `?snp_slice` - Main function documentation
-- `vignette("introduction")` - Getting started guide
-
-## Development
-
-Package development uses **devtools**. From the package root in R:
-
-```r
-devtools::document()   # Regenerate NAMESPACE and man from roxygen2
-devtools::test()      # Run tests
-devtools::check()     # R CMD check
-devtools::build()     # Build source tarball
-devtools::install()   # Install into default library
-```
-
-Or from the shell (requires `make`):
-
-```bash
-make document   # same as devtools::document()
-make test       # same as devtools::test()
-make check      # same as devtools::check()
-make build      # same as devtools::build()
-make prep       # document then check (good before release)
-```
 
 ## Citation
 
