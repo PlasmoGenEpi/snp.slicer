@@ -18,10 +18,10 @@ test_that("load_example_results works correctly", {
   expect_equal(nrow(result$allocation_matrix), 200)  # 200 hosts
   expect_equal(ncol(result$dictionary_matrix), 96)   # 96 SNPs
   
-  # Check model info
+  # Check model info (N, P in processed_data)
   expect_equal(result$model_info$model, "negative_binomial")
-  expect_equal(result$model_info$N, 200)
-  expect_equal(result$model_info$P, 96)
+  expect_equal(result$model_info$processed_data$N, 200)
+  expect_equal(result$model_info$processed_data$P, 96)
 })
 
 test_that("extract_strains works with real data", {
@@ -246,15 +246,15 @@ test_that("allocation matrix analysis works with real data", {
 test_that("model information is consistent", {
   result <- load_example_results()
   
-  # Check model info
+  # Check model info (N, P in processed_data)
   expect_true("model_info" %in% names(result))
   expect_equal(result$model_info$model, "negative_binomial")
-  expect_equal(result$model_info$N, 200)
-  expect_equal(result$model_info$P, 96)
+  expect_equal(result$model_info$processed_data$N, 200)
+  expect_equal(result$model_info$processed_data$P, 96)
   
   # Check consistency with matrices
-  expect_equal(nrow(result$allocation_matrix), result$model_info$N)
-  expect_equal(ncol(result$dictionary_matrix), result$model_info$P)
+  expect_equal(nrow(result$allocation_matrix), result$model_info$processed_data$N)
+  expect_equal(ncol(result$dictionary_matrix), result$model_info$processed_data$P)
 })
 
 test_that("convergence information is available", {
