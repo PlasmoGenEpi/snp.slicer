@@ -34,7 +34,7 @@ Suggests:
     rmarkdown,
     ggplot2
 VignetteBuilder: knitr
-URL: https://github.com/plasmogenepi/snp.slice
-BugReports: https://github.com/plasmogenepi/snp.slice/issues
+URL: https://github.com/plasmogenepi/snp.slicer
+BugReports: https://github.com/plasmogenepi/snp.slicer/issues
 Depends: 
     R (>= 4.1.0)
