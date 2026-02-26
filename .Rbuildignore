@@ -1,6 +1,7 @@
 ^doc$
 ^Meta$
 .DS_Store
+^logo\.png$
 ^data-raw$
 ^scripts$
 ^data/example_cat\.txt$
