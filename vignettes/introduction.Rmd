@@ -22,8 +22,6 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 ```
-# IN DEVELOPMENT TUTORIAL
-
 ## Overview
 
 SNP-Slice is a Bayesian nonparametric method for resolving multi-strain infections using slice sampling with stick-breaking construction. The algorithm simultaneously unveils strain haplotypes and links them to hosts from sequencing data.
@@ -33,106 +31,98 @@ This vignette demonstrates how to use SNP-Slice with the negative binomial model
 ## Installation
 
 ```{r eval=FALSE}
-# Install from GitHub (when available)
-devtools::install_github("plasmogenepi/snp.slicer")
+# Install from CRAN (when available)
+install.packages("snp.slicer")
+
+# Or install from GitHub
+devtools::install_github("plasmogenepi/snp.slice")
 ```
 
-## Basic Usage
+## Quick start
 
-### Loading the Package
+Load the package, example data, and pre-computed results:
 
 ```{r}
 library(snp.slicer)
-```
 
-### Working with Example Data
-
-SNP-Slice includes example read count data from a multi-strain infection study:
-
-```{r}
-# Load the example data
+# Example data: read count matrices (hosts × SNPs)
 data(example_snp_data, package = "snp.slicer")
-
-# Extract the data
 read0 <- example_snp_data$read0
 read1 <- example_snp_data$read1
-
-# Create data list
-data <- list(read0 = read0, read1 = read1)
-
-# Display data information
 cat("Data dimensions:", nrow(read0), "hosts ×", ncol(read0), "SNPs\n")
-cat("Read0 (reference allele) range:", range(read0), "\n")
-cat("Read1 (alternative allele) range:", range(read1), "\n")
-cat("Total read depth range:", range(read0 + read1), "\n")
-```
 
-### Loading Pre-computed Results
-
-For this vignette, we'll load pre-computed results from a SNP-Slice analysis using the negative binomial model:
-
-```{r}
-# Load pre-computed results
+# Pre-computed results (negative binomial model, 2000 MCMC iterations)
 result <- load_example_results()
 cat("Pre-computed results loaded successfully!\n")
-```
 
-### Examining Results
-
-Let's examine the results from our analysis:
-
-```{r}
-# Print basic information
+# Basic inspection
 print(result)
-
-# Get detailed summary
 summary(result)
 ```
 
-### Extracting Key Information
+## Understanding results
+
+The main outputs are the **allocation matrix** (hosts × strains) and the **dictionary matrix** (strains × SNPs). Use the extractors for convenience:
 
 ```{r}
-# Extract strain information
+# Strain and allocation summaries
 strains <- extract_strains(result)
-cat("Number of strains identified:", strains$n_strains, "\n")
-cat("Number of SNPs:", strains$n_snps, "\n")
-
-# Extract allocation information
 allocations <- extract_allocations(result)
-cat("Number of hosts:", allocations$n_hosts, "\n")
+
+cat("Strains identified:", strains$n_strains, "| SNPs:", strains$n_snps, "\n")
+cat("Hosts:", allocations$n_hosts, "\n")
 cat("Multiplicity of infection (MOI) summary:\n")
 print(summary(allocations$multiplicity_of_infection))
+
+# Key matrices (also available as result$allocation_matrix, result$dictionary_matrix)
+A <- result$allocation_matrix   # Hosts × Strains
+D <- result$dictionary_matrix   # Strains × SNPs
+
+cat("Allocation matrix:", dim(A), "| Dictionary matrix:", dim(D), "\n")
+print("Sample allocation (first 3 hosts, first 5 strains):")
+print(A[1:3, 1:5])
+print("Sample dictionary (first 3 strains, first 8 SNPs):")
+print(D[1:3, 1:8])
 ```
 
-### Analyzing Strain Patterns
+## Downstream analyses
+
+### Posterior allele frequencies
+
+Compute allele (or haplotype) frequencies for specific SNP sets from the MAP or MCMC results. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once.
 
 ```{r}
-# Access the dictionary matrix (strains × SNPs)
-D <- result$dictionary_matrix
-cat("Dictionary matrix dimensions:", dim(D), "\n")
+# Single target set: allele frequencies for SNPs 1, 5, and 10
+allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
+head(allele_freqs)
 
-# Show the first few strains and SNPs
-print(D[1:min(5, nrow(D)), 1:min(10, ncol(D))])
-
-# Count unique strain patterns
-unique_patterns <- unique(D)
-cat("Number of unique strain patterns:", nrow(unique_patterns), "\n")
+# Multiple target sets: pass a named list for one table per set
+target_sets <- list(
+  locus_a = c(1, 5),
+  locus_b = c(10, 15),
+  locus_c = c(20)
+)
+freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
+# Each element is a frequency table with columns: allele, frequency, count, total_parasites
+print(freqs_by_set$locus_a)
 ```
 
-### Analyzing Host Allocations
+### Individual COI with uncertainty
+
+Per-host complexity of infection (COI) is the number of distinct strains per host. Use `calculate_individual_coi()` for a point estimate (MAP) or, when MCMC samples were stored, posterior mean, SD, and a credible interval.
 
 ```{r}
-# Access the allocation matrix (hosts × strains)
-A <- result$allocation_matrix
-cat("Allocation matrix dimensions:", dim(A), "\n")
+# Point estimate only (from MAP allocation)
+coi_map <- calculate_individual_coi(result, use_map = TRUE)
+head(coi_map)
 
-# Show the first few hosts and their strain allocations
-print(A[1:min(5, nrow(A)), 1:min(5, ncol(A))])
-
-# Analyze strain frequencies across hosts
-strain_frequencies <- colSums(A)
-cat("Strain frequencies (number of hosts infected):\n")
-print(table(strain_frequencies))
+# With posterior uncertainty (requires store_mcmc = TRUE)
+if (!is.null(result$mcmc_samples)) {
+  coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50, interval = 0.95)
+  head(coi_post)
+  cat("\nSummary of COI posterior SD:\n")
+  print(summary(coi_post$coi_sd))
+}
 ```
 
 ## Running Your Own Analysis
@@ -141,11 +131,12 @@ If you want to run the analysis yourself, here's how to do it:
 
 ```{r eval=FALSE}
 # Run SNP-Slice with the negative binomial model
+data <- list(read0 = read0, read1 = read1)
 result <- snp_slice(data, 
                    model = "negative_binomial",
-                   n_mcmc = 200,        # Number of MCMC iterations
-                   store_mcmc = TRUE,   # Store MCMC samples for diagnostics
-                   verbose = TRUE)      # Show progress
+                   n_mcmc = 2000,      # Number of MCMC iterations
+                   store_mcmc = TRUE,  # Store MCMC samples for diagnostics
+                   verbose = TRUE)     # Show progress
 ```
 
 ## Parameter Tuning
@@ -158,58 +149,34 @@ result_tuned <- snp_slice(data,
                          alpha = 1.5,        # IBP concentration parameter
                          rho = 0.3,          # Dictionary sparsity
                          threshold = 0.005,  # Single infection threshold
-                         n_mcmc = 200,
-                         burnin = 20,        # Custom burn-in
+                         n_mcmc = 2000,
+                         burnin = 500,       # Custom burn-in
                          gap = 10,           # Early stopping threshold
                          seed = 456,         # Reproducibility
                          verbose = FALSE)
 ```
 
-## Convergence Diagnostics
+## Convergence diagnostics
 
-When you store MCMC samples, you can analyze convergence:
+When you store MCMC samples (`store_mcmc = TRUE`), you can assess convergence with effective sample size (ESS) and trace plots:
 
 ```{r}
-# Calculate effective sample size for log posterior
 if (!is.null(result$mcmc_samples)) {
+  # Effective sample size for log posterior
   ess_logpost <- effective_sample_size(result, parameter = "logpost")
-  if (!is.null(ess_logpost) && is.numeric(ess_logpost)) {
-    cat("Effective sample size (logpost):", round(ess_logpost, 1), "\n")
-  } else {
-    cat("Could not calculate effective sample size\n")
-  }
+  ess_val <- if (is.numeric(ess_logpost)) ess_logpost else ess_logpost$ess
+  cat("Effective sample size (log posterior):", round(ess_val, 1), "\n")
+  
+  # Trace plot of log posterior
+  plot_convergence(result, type = "logpost")
 } else {
-  cat("MCMC samples not stored in results\n")
+  cat("MCMC samples not stored in results (set store_mcmc = TRUE when running snp_slice)\n")
 }
 ```
 
-## Working with Results
+You can also use `plot_convergence(result, type = "kstar")` for the number of active strains or `type = "n_strains"` for strain count over iterations. See `?effective_sample_size` and `?plot_convergence` for options.
 
-### Accessing Key Matrices
-
-```{r}
-# Get the key matrices from results
-A <- result$allocation_matrix      # Hosts × Strains
-D <- result$dictionary_matrix      # Strains × SNPs
-
-cat("Allocation matrix dimensions:", dim(A), "\n")
-cat("Dictionary matrix dimensions:", dim(D), "\n")
-
-# Show sample of allocation matrix
-cat("Sample of allocation matrix (first 3 hosts, first 5 strains):\n")
-print(A[1:3, 1:5])
-```
-
-### Analyzing Strain Diversity (MOI)
-
-```{r}
-# Calculate strain diversity per host (same as Multiplicity of Infection)
-strain_diversity <- rowSums(A > 0)
-cat("Strain diversity per host (MOI):\n")
-print(table(strain_diversity))
-```
-
-## Visualizing Results
+## Visualizing results
 
 Let's create some informative plots to better understand the analysis results:
 
@@ -225,7 +192,7 @@ moi_df <- data.frame(
 
 ggplot(moi_df, aes(x = moi)) +
   geom_histogram(binwidth = 1, fill = "steelblue", alpha = 0.7, color = "black") +
-  geom_vline(aes(xintercept = mean(moi)), color = "red", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = mean(moi)), color = "red", linetype = "dashed", linewidth = 1) +
   labs(
     title = "Distribution of Multiplicity of Infection (MOI)",
     subtitle = "Number of Strains per Host",
@@ -371,18 +338,16 @@ knitr::kable(summary_stats,
              caption = "Summary Statistics from SNP-Slice Analysis")
 ```
 
-## Next Steps
+## Next steps
 
-This vignette covered the basics of using SNP-Slice with the negative binomial model. For more advanced usage:
+This vignette covered the basics of using SNP-Slice with the negative binomial model. For more:
 
-1. **Other Models**: Try Poisson, binomial, or categorical models
-2. **Advanced Diagnostics**: Learn about convergence diagnostics and troubleshooting
-3. **Real Data**: Apply SNP-Slice to your own sequencing data
-4. **Parameter Optimization**: Fine-tune parameters for your specific application
+- **Other models**: Try Poisson, binomial, or categorical models via the `model` argument in `snp_slice()`.
+- **Diagnostics**: Use `?effective_sample_size` and `?plot_convergence` when MCMC samples are stored.
+- **Your data**: Apply SNP-Slice to your own read count or categorical data; see `?snp_slice` and `?load_example_results` for input format and examples.
+- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `burnin`, and `gap` for your application.
 
 ## References
-
-For more information about the SNP-Slice algorithm, see:
 
 - SNP-Slice Resolves Mixed Infections: Simultaneously Unveiling Strain Haplotypes and Linking Them to Hosts
 - [BioRxiv preprint](https://www.biorxiv.org/content/10.1101/2023.07.29.551098v2)

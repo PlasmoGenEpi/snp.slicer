@@ -26,7 +26,28 @@ install.packages(
 
 - `?snp_slice` - Main function documentation
 - `vignette("introduction")` - Getting started guide
-- `vignette("model_comparison")` - Comparing different models
+
+## Development
+
+Package development uses **devtools**. From the package root in R:
+
+```r
+devtools::document()   # Regenerate NAMESPACE and man from roxygen2
+devtools::test()      # Run tests
+devtools::check()     # R CMD check
+devtools::build()     # Build source tarball
+devtools::install()   # Install into default library
+```
+
+Or from the shell (requires `make`):
+
+```bash
+make document   # same as devtools::document()
+make test       # same as devtools::test()
+make check      # same as devtools::check()
+make build      # same as devtools::build()
+make prep       # document then check (good before release)
+```
 
 ## Citation
 
