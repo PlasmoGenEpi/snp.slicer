@@ -124,7 +124,6 @@ run_mcmc <- function(model_obj, n_mcmc, burnin, gap, verbose, store_mcmc) {
   
   # Storage for samples if requested
   samples <- if (store_mcmc) list() else NULL
-  
   for (iter in 1:n_mcmc) {
     # Run one MCMC iteration
     state <- slice_iter(state, model_obj)
@@ -155,7 +154,7 @@ run_mcmc <- function(model_obj, n_mcmc, burnin, gap, verbose, store_mcmc) {
     }
     
     # Print progress
-    if (verbose && iter %% 100 == 0) {
+    if (verbose && iter %% 10 == 0) {
       cat("Iteration", iter, "active strains:", sum(colSums(state$A) > 0),
           "kstar:", state$kstar, "ktrunc:", state$ktrunc,
           "single infections:", sum(rowSums(state$A) == 1),
