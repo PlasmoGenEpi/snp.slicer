@@ -35,7 +35,7 @@ Suggests:
     ggplot2,
     pkgdown
 VignetteBuilder: knitr
-URL: https://github.com/plasmogenepi/snp.slicer
+URL: https://github.com/plasmogenepi/snp.slicer, https://plasmogenepi.github.io/snp.slicer/
 BugReports: https://github.com/plasmogenepi/snp.slicer/issues
 Depends: 
     R (>= 4.2.0)
