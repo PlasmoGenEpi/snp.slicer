@@ -1,0 +1,111 @@
+# SNP-Slice: Bayesian Nonparametric Resolution of Multi-Strain Infections
+
+This library provides an installable implementation of the original
+`snp-slice` [model](https://github.com/nianqiaoju/snp-slice). We have no
+affiliation with this author and provide this implementation as is.
+
+## Overview
+
+SNP-Slice is a Bayesian nonparametric method for resolving multi-strain
+infections using slice sampling. The algorithm simultaneously estimates
+strain haplotypes and links them to hosts from SNP data.
+
+## Installation
+
+``` r
+# Install from our r-universe
+install.packages(
+    'snp.slicer', 
+    repos = c('https://plasmogenepi.r-universe.dev', 'https://cloud.r-project.org')
+)
+```
+
+## Features
+
+- **Multiple Observation Models**: Supports categorical, Poisson,
+  binomial, and negative binomial models
+- **Flexible Data Input**: Accepts read count data, categorical data, or
+  file paths
+- **Convergence Diagnostics**: Built-in monitoring and early stopping
+- **Comprehensive Results**: Returns allocation matrix, dictionary
+  matrix, and diagnostics
+
+## Citation
+
+If you use SNP-Slice in your research, please cite:
+
+    @article{Ju_Liu_He_2024,
+        title={SNP-slice resolves mixed infections: simultaneously unveiling strain haplotypes and linking them to hosts},
+        volume={40},
+        ISSN={1367-4811},
+        DOI={10.1093/bioinformatics/btae344},
+        number={6},
+        journal={Bioinformatics},
+        author={Ju, Nianqiao and Liu, Jiawei and He, Qixin},
+        year={2024},
+        month=june,
+        pages={btae344}
+    }
+
+> [Bioinformatics
+> Article](https://academic.oup.com/bioinformatics/article/40/6/btae344/7695237)
+
+## License
+
+This package is licensed under the GPL-3 License.
+
+# Package index
+
+## All functions
+
+- [`calculate_allele_frequencies()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_allele_frequencies.md)
+  : Calculate Allele Frequencies from MCMC Results
+- [`calculate_allele_frequencies_by_sets()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_allele_frequencies_by_sets.md)
+  : Calculate allele frequencies for multiple target sets
+- [`calculate_individual_coi()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_individual_coi.md)
+  : Calculate estimated individual COI with uncertainty
+- [`clear_performance_log()`](https://plasmogenepi.github.io/snp.slicer/reference/clear_performance_log.md)
+  : Clear performance log
+- [`effective_sample_size()`](https://plasmogenepi.github.io/snp.slicer/reference/effective_sample_size.md)
+  : Calculate effective sample size for MCMC diagnostics
+- [`example_read0`](https://plasmogenepi.github.io/snp.slicer/reference/example_read0.md)
+  : Example Read Count Data - Reference Alleles
+- [`example_read1`](https://plasmogenepi.github.io/snp.slicer/reference/example_read1.md)
+  : Example Read Count Data - Alternate Alleles
+- [`example_snp_data`](https://plasmogenepi.github.io/snp.slicer/reference/example_snp_data.md)
+  : Example SNP Data
+- [`extract_allocations()`](https://plasmogenepi.github.io/snp.slicer/reference/extract_allocations.md)
+  : Extract allocation information from SNP-Slice results
+- [`extract_strains()`](https://plasmogenepi.github.io/snp.slicer/reference/extract_strains.md)
+  : Extract strain information from SNP-Slice results
+- [`get_performance_summary()`](https://plasmogenepi.github.io/snp.slicer/reference/get_performance_summary.md)
+  : Get performance summary
+- [`load_example_results()`](https://plasmogenepi.github.io/snp.slicer/reference/load_example_results.md)
+  : Load Example Analysis Results
+- [`performance_env`](https://plasmogenepi.github.io/snp.slicer/reference/performance_env.md)
+  : Performance Logger for SNP-Slice
+- [`plot_convergence()`](https://plasmogenepi.github.io/snp.slicer/reference/plot_convergence.md)
+  : Plot convergence diagnostics
+- [`print(`*`<ess_all_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.ess_all_results.md)
+  : Print comprehensive ESS results for all parameters
+- [`print(`*`<ess_result>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.ess_result.md)
+  : Print effective sample size results
+- [`print(`*`<snp_slice_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.snp_slice_results.md)
+  : Print SNP-Slice results
+- [`print_performance_summary()`](https://plasmogenepi.github.io/snp.slicer/reference/print_performance_summary.md)
+  : Print performance summary
+- [`snp_slice()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_categorical()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_poisson()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_negative_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  : Bayesian Nonparametric Resolution of Multi-Strain Infections
+- [`summary(`*`<snp_slice_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/summary.snp_slice_results.md)
+  : Print summary of SNP-Slice results
+
+# Articles
+
+### All vignettes
+
+- [Introduction to
+  SNP-Slice](https://plasmogenepi.github.io/snp.slicer/articles/introduction.md):
