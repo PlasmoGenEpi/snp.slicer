@@ -35,7 +35,11 @@ snp_slice_negative_binomial(data, ...)
 \arguments{
 \item{data}{Input data. Can be a matrix, data.frame, or file path. For read count data,
 should be a list with elements \code{read1} and \code{read0} (or \code{total}). For categorical data,
-should be a matrix with values 0, 0.5, or 1.}
+can be a matrix with values 0, 0.5, or 1; or a long-format data.frame with columns
+\code{specimen_id}, \code{target_id}, \code{target_value}, and \code{target_count}.
+For a categorical data.frame, counts are converted to categories: ref-only -> 0,
+alt-only -> 1, both present -> 0.5, zero total -> NA. Matrix and categorical file
+inputs (e.g. \code{*_cat.txt}) remain supported.}
 
 \item{model}{Observation model to use. Options: "categorical", "poisson", "binomial",
 "negative_binomial" (default).}

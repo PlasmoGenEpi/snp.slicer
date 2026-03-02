@@ -7,7 +7,11 @@
 #'
 #' @param data Input data. Can be a matrix, data.frame, or file path. For read count data,
 #'   should be a list with elements `read1` and `read0` (or `total`). For categorical data,
-#'   should be a matrix with values 0, 0.5, or 1.
+#'   can be a matrix with values 0, 0.5, or 1; or a long-format data.frame with columns
+#'   \code{specimen_id}, \code{target_id}, \code{target_value}, and \code{target_count}.
+#'   For a categorical data.frame, counts are converted to categories: ref-only -> 0,
+#'   alt-only -> 1, both present -> 0.5, zero total -> NA. Matrix and categorical file
+#'   inputs (e.g. \code{*_cat.txt}) remain supported.
 #' @param model Observation model to use. Options: "categorical", "poisson", "binomial",
 #'   "negative_binomial" (default).
 #' @param n_mcmc Number of MCMC iterations (default: 10000).
@@ -77,7 +81,7 @@ snp_slice <- function(data,
   }
 
   # Validate input data before preprocessing
-  validate_input_data(data, model)
+  validate_input_data(data, model, ...)
 
   # Preprocess data
   processed_data <- preprocess_data(data, model, ...)

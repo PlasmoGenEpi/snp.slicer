@@ -70,9 +70,19 @@ test_that("calculate_allele_frequencies with use_map = FALSE when MCMC samples e
   )
   freq_df <- calculate_allele_frequencies(result, c(1L, 2L), use_map = FALSE, n_samples = 5)
   expect_s3_class(freq_df, "data.frame")
-  expect_equal(sort(colnames(freq_df)), sort(c("allele", "frequency", "count", "total_parasites")))
+  mcmc_cols <- c("allele", "frequency", "frequency_sd", "frequency_lower", "frequency_upper", "mean_count", "n_samples")
+  expect_equal(sort(colnames(freq_df)), sort(mcmc_cols))
   expect_true(all(freq_df$frequency >= 0 & freq_df$frequency <= 1))
   expect_equal(sum(freq_df$frequency), 1)
+  expect_equal(unique(freq_df$n_samples), 5)
+  expect_true(all(freq_df$mean_count >= 0))
+  expect_false(is.null(attr(freq_df, "mean_total_parasites")))
+})
+
+test_that("calculate_allele_frequencies errors on invalid interval", {
+  result <- make_allele_freq_result()
+  expect_error(calculate_allele_frequencies(result, c(1L, 2L), interval = 0), "interval must be")
+  expect_error(calculate_allele_frequencies(result, c(1L, 2L), interval = 1), "interval must be")
 })
 
 test_that("calculate_allele_frequencies_by_sets returns list of frequency tables", {

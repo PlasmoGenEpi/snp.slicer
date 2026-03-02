@@ -4,12 +4,14 @@
 \alias{validate_input_data}
 \title{Validate input data for SNP-Slice}
 \usage{
-validate_input_data(data, model)
+validate_input_data(data, model, ...)
 }
 \arguments{
 \item{data}{Input data to validate}
 
 \item{model}{Model type to validate against}
+
+\item{...}{Passed through; used for column-name args when validating categorical data.frames}
 }
 \value{
 TRUE if valid, otherwise throws error

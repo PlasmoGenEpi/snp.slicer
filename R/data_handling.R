@@ -9,17 +9,18 @@ utils::globalVariables(c(
 #'
 #' @param data Input data to validate
 #' @param model Model type to validate against
+#' @param ... Passed through; used for column-name args when validating categorical data.frames
 #'
 #' @return TRUE if valid, otherwise throws error
 #' @keywords internal
-validate_input_data <- function(data, model) {
+validate_input_data <- function(data, model, ...) {
   
   # Check if data is NULL or empty
   if (is.null(data) || (is.list(data) && length(data) == 0)) {
     stop("Data cannot be NULL or empty")
   }
   
-  # Handle different data types
+  # Handle different data types (check data.frame before list, since data.frames are lists in R)
   if (is.character(data)) {
     # File path - validate file exists
     if (!file.exists(data)) {
@@ -27,7 +28,33 @@ validate_input_data <- function(data, model) {
     }
     return(TRUE)
   }
-  
+
+  if (is.data.frame(data)) {
+    if (model == "categorical") {
+      params <- list(
+        target_id_col = "target_id",
+        target_value_col = "target_value",
+        specimen_id_col = "specimen_id",
+        target_count_col = "target_count"
+      )
+      overrides <- list(...)
+      for (nm in names(overrides)) if (nm %in% names(params)) params[[nm]] <- overrides[[nm]]
+      required <- c(params$target_id_col, params$target_value_col, params$specimen_id_col, params$target_count_col)
+      missing <- setdiff(required, names(data))
+      if (length(missing) > 0) {
+        stop("Categorical data.frame must have columns: ", paste(required, collapse = ", "), "; missing: ", paste(missing, collapse = ", "))
+      }
+      if (nrow(data) == 0) {
+        stop("Categorical data.frame cannot be empty")
+      }
+      count_col <- params$target_count_col
+      if (is.numeric(data[[count_col]]) && any(data[[count_col]] < 0, na.rm = TRUE)) {
+        stop("target_count cannot be negative")
+      }
+    }
+    return(TRUE)
+  }
+
   if (is.matrix(data)) {
     # Direct matrix/data.frame input
     if (nrow(data) == 0 || ncol(data) == 0) {
@@ -57,36 +84,31 @@ validate_input_data <- function(data, model) {
     if (model == "categorical") {
       stop("Categorical model expects matrix/data.frame, not list")
     }
-    
+
     # Check for required elements
     if (!all(c("read1", "read0") %in% names(data))) {
       stop("List data must contain 'read1' and 'read0' elements")
     }
-    
+
     # Validate read1 and read0
     read1 <- data$read1
     read0 <- data$read0
-    
+
     if (!is.matrix(read1) || !is.matrix(read0)) {
       stop("read1 and read0 must be matrices")
     }
-    
+
     if (!identical(dim(read1), dim(read0))) {
       stop("read1 and read0 must have identical dimensions")
     }
-    
+
     if (any(read1 < 0, na.rm = TRUE) || any(read0 < 0, na.rm = TRUE)) {
       stop("Read counts cannot be negative")
     }
-    
+
     return(TRUE)
   }
 
-  if(is.data.frame(data)) {
-    return(TRUE)
-    # TODO: validate data frame
-  }
-  
   stop("Unsupported data type. Expected matrix, data.frame, list, or file path")
 }
 
@@ -147,6 +169,30 @@ validate_mcmc_settings <- function(n_mcmc, burnin, gap) {
   return(TRUE)
 }
 
+#' Convert read count matrices to categorical observation matrix
+#'
+#' Maps reference (read0) and alternate (read1) counts to categorical states:
+#' 0 (ref only), 1 (alt only), 0.5 (both), or NA (zero total).
+#'
+#' @param read0 Matrix of reference allele counts (specimens x targets).
+#' @param read1 Matrix of alternate allele counts (same dimensions as read0).
+#' @return Numeric matrix of same shape with values in \{0, 0.5, 1, NA\}, dimnames preserved.
+#' @keywords internal
+counts_to_categorical <- function(read0, read1) {
+  if (!identical(dim(read0), dim(read1))) {
+    stop("read0 and read1 must have identical dimensions")
+  }
+  if (any(read0 < 0, na.rm = TRUE) || any(read1 < 0, na.rm = TRUE)) {
+    stop("Read counts cannot be negative")
+  }
+  total <- read0 + read1
+  y <- matrix(NA_real_, nrow = nrow(read0), ncol = ncol(read0), dimnames = dimnames(read0))
+  y[total > 0 & read0 > 0 & read1 == 0] <- 0
+  y[total > 0 & read0 == 0 & read1 > 0] <- 1
+  y[total > 0 & read0 > 0 & read1 > 0] <- 0.5
+  y
+}
+
 #' Load data from a dataframe
 #'
 #' @param data Input dataframe with columns:
@@ -156,7 +202,7 @@ validate_mcmc_settings <- function(n_mcmc, burnin, gap) {
 #'   \item{target_value}{Target value}
 #'   \item{target_count}{Target count (optional)}
 #' }
-#' For each target, there are at exactly 2 taget values observed. If there is only one, 
+#' For each target, there are at exactly 2 target values observed. If there is only one,
 #' the second value is set to unknown_target_value. Target count is required if model is
 #' not "categorical".
 #' @param model Model type
@@ -167,6 +213,12 @@ validate_mcmc_settings <- function(n_mcmc, burnin, gap) {
 #' @param target_count_col Name of the target count column
 #'
 #' @return Processed data list with y, r, and metadata
+#'
+#' @details When \code{model == "categorical"}, long-format data.frames are handled by
+#'   \code{load_dataframe_categorical}, which builds read0/read1 matrices from the same
+#'   column layout and then converts counts to categorical observations: ref-only -> 0,
+#'   alt-only -> 1, both present -> 0.5, zero total -> NA.
+#'
 #' @keywords internal
 load_dataframe <- function(
   data, model, unknown_target_value = "?", target_id_col = "target_id", target_value_col = "target_value", specimen_id_col = "specimen_id", target_count_col = "target_count") {
@@ -256,6 +308,47 @@ load_dataframe <- function(
 
 }
 
+#' Load long-format data.frame for categorical model
+#'
+#' Uses the same join/completion logic as \code{\link{load_dataframe}} to build
+#' read0/read1 matrices, then converts counts to categorical observations (0, 0.5, 1, NA)
+#' via \code{\link{counts_to_categorical}}.
+#'
+#' @param data Input dataframe (same column semantics as \code{load_dataframe}).
+#' @param model Model type (must be \code{"categorical"}).
+#' @param unknown_target_value,target_id_col,target_value_col,specimen_id_col,target_count_col
+#'   Same as \code{\link{load_dataframe}}.
+#' @return Processed data list with \code{data_type = "categorical"}, \code{y} the categorical
+#'   matrix, and \code{r = NULL}.
+#' @keywords internal
+load_dataframe_categorical <- function(
+  data, model, unknown_target_value = "?", target_id_col = "target_id",
+  target_value_col = "target_value", specimen_id_col = "specimen_id",
+  target_count_col = "target_count", ...) {
+  raw <- load_dataframe(
+    data, model,
+    unknown_target_value = unknown_target_value,
+    target_id_col = target_id_col,
+    target_value_col = target_value_col,
+    specimen_id_col = specimen_id_col,
+    target_count_col = target_count_col
+  )
+  read0_mat <- raw$y
+  read1_mat <- raw$r - raw$y
+  y_cat <- counts_to_categorical(read0_mat, read1_mat)
+  list(
+    y = y_cat,
+    r = NULL,
+    N = raw$N,
+    P = raw$P,
+    model = model,
+    data_type = "categorical",
+    target_ids = raw$target_ids,
+    specimen_ids = raw$specimen_ids,
+    r0_values = raw$r0_values,
+    r1_values = raw$r1_values
+  )
+}
 
 #' Preprocess data for SNP-Slice
 #'
@@ -267,6 +360,9 @@ load_dataframe <- function(
 preprocess_data <- function(data, model, ...) {
 
   if (is.data.frame(data)) {
+    if (model == "categorical") {
+      return(load_dataframe_categorical(data, model, ...))
+    }
     return(load_dataframe(data, model, ...))
   }
  
@@ -502,23 +598,34 @@ load_example_results <- function() {
 #' @param snp_indices A vector of SNP indices to treat as a single allele
 #' @param use_map Logical, whether to use MAP estimates (TRUE) or sample from MCMC (FALSE)
 #' @param n_samples Number of MCMC samples to use if use_map = FALSE (default: 100)
+#' @param interval Numeric in (0, 1). Credible interval width when using MCMC (e.g. 0.95).
 #' @param allele_sep Separator for allele strings (default: "|")
 #'
-#' @return A data frame with columns:
-#'   \item{allele}{String representation of the allele (e.g., "A|T|T" for 3 SNPs)}
-#'   \item{frequency}{Proportion of total parasites with this allele}
-#'   \item{count}{Absolute count of parasites with this allele}
-#'   \item{total_parasites}{Total number of parasites across all individuals}
+#' @return The structure depends on \code{use_map}. \describe{
+#'   \item{MAP (\code{use_map = TRUE})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele in the MAP allocation), \code{total_parasites} (total parasites in the MAP allocation; same for every row).}
+#'   \item{MCMC (\code{use_map = FALSE})}{Data frame with columns: \code{allele}, \code{frequency} (posterior mean proportion), \code{frequency_sd} (posterior SD of proportion across samples), \code{frequency_lower} and \code{frequency_upper} (credible interval, e.g. 2.5\% and 97.5\%), \code{mean_count} (mean parasites with this allele per MCMC sample; does not scale with \code{n_samples}), \code{n_samples}. Attribute \code{mean_total_parasites}: mean total parasites per MCMC sample (same for all alleles).}
+#' }
+#'
+#' @details With \code{use_map = FALSE}, counts are summarized as per-sample means rather than sums,
+#'   so \code{mean_count} and \code{mean_total_parasites} are interpretable regardless of \code{n_samples}.
+#'   Frequency uncertainty (\code{frequency_sd}, \code{frequency_lower}, \code{frequency_upper}) is
+#'   computed from the distribution of allele frequencies across MCMC samples.
 #'
 #' @export
 #' @examples
 #' # Load example results
 #' result <- load_example_results()
 #' 
-#' # Calculate allele frequencies for SNPs 1, 5, and 10
+#' # Calculate allele frequencies for SNPs 1, 5, and 10 (MAP)
 #' allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 #' print(allele_freqs)
-calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, allele_sep = "|") {
+#'
+#' # With MCMC: posterior mean, SD, credible interval, and per-sample mean count
+#' if (!is.null(result$mcmc_samples)) {
+#'   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
+#'   print(allele_freqs_mcmc)
+#' }
+calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|") {
   if (length(unique(snp_indices)) != length(snp_indices)) {
     stop("snp_indices must be unique")
   }
@@ -551,60 +658,46 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
   if (!is.numeric(n_samples) || n_samples < 1) {
     stop("n_samples must be a positive integer")
   }
+
+  if (!is.numeric(interval) || interval <= 0 || interval >= 1) {
+    stop("interval must be a number between 0 and 1 (exclusive)")
+  }
   
-  # Get the number of SNPs in the allele
-  n_snps <- length(snp_indices)
   r0_values <- results$model_info$processed_data$r0_values[snp_indices]
   r1_values <- results$model_info$processed_data$r1_values[snp_indices] 
 
   if (use_map) {
-    # Use MAP estimates
+    # Use MAP estimates: single allocation, return count and total_parasites
     A <- results$allocation_matrix
     D <- results$dictionary_matrix
-       
-    # Calculate allele frequencies for MAP estimate
     allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep)
-    
+    total_parasites <- sum(allele_counts$count)
+    result_df <- data.frame(
+      allele = allele_counts$allele,
+      frequency = allele_counts$count / total_parasites,
+      count = allele_counts$count,
+      total_parasites = total_parasites,
+      stringsAsFactors = FALSE
+    )
   } else {
-    # Sample from MCMC results
+    # MCMC: per-sample frequencies and counts, then summarize (sample-size invariant)
     if (is.null(results$mcmc_samples)) {
       stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
     }
-    
-    # Sample from MCMC results
     n_total_samples <- length(results$mcmc_samples)
     if (n_samples > n_total_samples) {
       warning("Requested ", n_samples, " samples but only ", n_total_samples, " available. Using all available samples.")
       n_samples <- n_total_samples
     }
-    
-    # Randomly sample from MCMC results
     sample_indices <- sample(seq_len(n_total_samples), n_samples, replace = FALSE)
-    
-    # Calculate allele frequencies across samples
     allele_counts_list <- lapply(sample_indices, function(i) {
       sample_data <- results$mcmc_samples[[i]]
       calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep)
     })
-    
-    # Aggregate counts across samples
-    allele_counts <- aggregate_allele_counts(allele_counts_list)
+    result_df <- summarize_allele_frequencies_mcmc(allele_counts_list, interval = interval, n_samples = n_samples)
   }
   
-  # Convert to frequency data frame
-  total_parasites <- sum(allele_counts$count)
-  
-  result_df <- data.frame(
-    allele = allele_counts$allele,
-    frequency = allele_counts$count / total_parasites,
-    count = allele_counts$count,
-    total_parasites = total_parasites,
-    stringsAsFactors = FALSE
-  )
-  
-  # Sort by frequency (descending)
   result_df <- result_df[order(result_df$frequency, decreasing = TRUE), ]
-  
   return(result_df)
 }
 
@@ -620,11 +713,17 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 #'   names are used for the returned list.
 #' @param use_map Logical; use MAP estimates (TRUE) or sample from MCMC (FALSE).
 #' @param n_samples Number of MCMC samples to use if \code{use_map = FALSE} (default: 100).
+#' @param interval Credible interval width when \code{use_map = FALSE} (e.g. 0.95).
 #' @param allele_sep Separator for allele strings (default: "|").
 #'
-#' @return A named list of data frames. Each data frame has columns
-#'   \code{allele}, \code{frequency}, \code{count}, \code{total_parasites}.
-#'   Names are from \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc.
+#' @return A named list of data frames, one per target set. List names come from
+#'   \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc. Each data frame
+#'   has the same structure as the return value of \code{\link{calculate_allele_frequencies}}:
+#'   with MAP, columns \code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
+#'   with MCMC, columns \code{allele}, \code{frequency}, \code{frequency_sd},
+#'   \code{frequency_lower}, \code{frequency_upper}, \code{mean_count}, \code{n_samples},
+#'   and attribute \code{mean_total_parasites}. See that function's help for the meaning
+#'   of each column.
 #'
 #' @export
 #' @examples
@@ -632,7 +731,7 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 #' target_sets <- list(locus_a = c(1, 5), locus_b = c(10))
 #' freqs <- calculate_allele_frequencies_by_sets(result, target_sets)
 #' print(freqs$locus_a)
-calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map = TRUE, n_samples = 100, allele_sep = "|") {
+calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|") {
   if (!is.list(target_sets)) {
     stop("target_sets must be a list")
   }
@@ -646,7 +745,7 @@ calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map =
     }
   }
   out <- lapply(target_sets, function(set) {
-    calculate_allele_frequencies(results, snp_indices = set, use_map = use_map, n_samples = n_samples, allele_sep = allele_sep)
+    calculate_allele_frequencies(results, snp_indices = set, use_map = use_map, n_samples = n_samples, interval = interval, allele_sep = allele_sep)
   })
   if (!is.null(names(target_sets))) {
     names(out) <- names(target_sets)
@@ -654,6 +753,56 @@ calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map =
     names(out) <- paste0("set_", seq_along(target_sets))
   }
   out
+}
+
+#' Summarize allele frequencies from per-sample counts (MCMC path).
+#' Builds per-sample frequencies, then returns posterior mean, SD, credible interval,
+#' and per-sample mean count. Sample-size invariant.
+#' @keywords internal
+summarize_allele_frequencies_mcmc <- function(allele_counts_list, interval = 0.95, n_samples = length(allele_counts_list)) {
+  all_alleles <- unique(unlist(lapply(allele_counts_list, function(x) x$allele)))
+  n_samp <- length(allele_counts_list)
+  total_per_sample <- vapply(allele_counts_list, function(x) sum(x$count), numeric(1L))
+
+  # Count matrix: rows = alleles, columns = samples
+  count_matrix <- matrix(0, nrow = length(all_alleles), ncol = n_samp, dimnames = list(all_alleles, NULL))
+  for (j in seq_len(n_samp)) {
+    sample_df <- allele_counts_list[[j]]
+    for (i in seq_len(nrow(sample_df))) {
+      a <- sample_df$allele[i]
+      count_matrix[a, j] <- sample_df$count[i]
+    }
+  }
+
+  # Per-sample frequency (0 where total is 0)
+  freq_matrix <- count_matrix
+  for (j in seq_len(n_samp)) {
+    tot <- total_per_sample[j]
+    if (tot > 0) {
+      freq_matrix[, j] <- count_matrix[, j] / tot
+    }
+  }
+
+  probs <- c((1 - interval) / 2, 1 - (1 - interval) / 2)
+  frequency <- rowMeans(freq_matrix)
+  frequency_sd <- apply(freq_matrix, 1L, stats::sd)
+  frequency_lower <- apply(freq_matrix, 1L, stats::quantile, probs = probs[1L], names = FALSE, na.rm = TRUE)
+  frequency_upper <- apply(freq_matrix, 1L, stats::quantile, probs = probs[2L], names = FALSE, na.rm = TRUE)
+  mean_count <- rowMeans(count_matrix)
+  mean_total_parasites <- mean(total_per_sample)
+
+  result_df <- data.frame(
+    allele = all_alleles,
+    frequency = frequency,
+    frequency_sd = frequency_sd,
+    frequency_lower = frequency_lower,
+    frequency_upper = frequency_upper,
+    mean_count = mean_count,
+    n_samples = n_samp,
+    stringsAsFactors = FALSE
+  )
+  attr(result_df, "mean_total_parasites") <- mean_total_parasites
+  result_df
 }
 
 #' Calculate allele counts for a single sample

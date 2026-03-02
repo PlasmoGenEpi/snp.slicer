@@ -9,6 +9,7 @@ calculate_allele_frequencies_by_sets(
   target_sets,
   use_map = TRUE,
   n_samples = 100,
+  interval = 0.95,
   allele_sep = "|"
 )
 }
@@ -23,12 +24,19 @@ names are used for the returned list.}
 
 \item{n_samples}{Number of MCMC samples to use if \code{use_map = FALSE} (default: 100).}
 
+\item{interval}{Credible interval width when \code{use_map = FALSE} (e.g. 0.95).}
+
 \item{allele_sep}{Separator for allele strings (default: "|").}
 }
 \value{
-A named list of data frames. Each data frame has columns
-\code{allele}, \code{frequency}, \code{count}, \code{total_parasites}.
-Names are from \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc.
+A named list of data frames, one per target set. List names come from
+\code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc. Each data frame
+has the same structure as the return value of \code{\link{calculate_allele_frequencies}}:
+with MAP, columns \code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
+with MCMC, columns \code{allele}, \code{frequency}, \code{frequency_sd},
+\code{frequency_lower}, \code{frequency_upper}, \code{mean_count}, \code{n_samples},
+and attribute \code{mean_total_parasites}. See that function's help for the meaning
+of each column.
 }
 \description{
 For each target set, computes allele frequencies from MCMC/MAP results and

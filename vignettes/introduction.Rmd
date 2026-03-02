@@ -89,12 +89,18 @@ print(D[1:3, 1:8])
 
 ### Posterior allele frequencies
 
-Compute allele (or haplotype) frequencies for specific SNP sets from the MAP or MCMC results. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once.
+Compute allele (or haplotype) frequencies for specific SNP sets from the MAP or MCMC results. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once. With MAP you get point estimates and literal counts (`allele`, `frequency`, `count`, `total_parasites`). With MCMC you get a posterior mean frequency, SD, credible interval, and per-sample mean count (`mean_count`, `n_samples`), so the table does not depend on how many MCMC samples were used.
 
 ```{r}
-# Single target set: allele frequencies for SNPs 1, 5, and 10
+# Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
+
+# With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
+if (!is.null(result$mcmc_samples)) {
+  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
+  head(allele_freqs_mcmc)
+}
 
 # Multiple target sets: pass a named list for one table per set
 target_sets <- list(
@@ -103,7 +109,7 @@ target_sets <- list(
   locus_c = c(20)
 )
 freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
-# Each element is a frequency table with columns: allele, frequency, count, total_parasites
+# Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 ```
 
