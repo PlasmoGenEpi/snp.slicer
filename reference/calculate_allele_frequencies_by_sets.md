@@ -12,6 +12,7 @@ calculate_allele_frequencies_by_sets(
   target_sets,
   use_map = TRUE,
   n_samples = 100,
+  interval = 0.95,
   allele_sep = "|"
 )
 ```
@@ -36,15 +37,25 @@ calculate_allele_frequencies_by_sets(
 
   Number of MCMC samples to use if `use_map = FALSE` (default: 100).
 
+- interval:
+
+  Credible interval width when `use_map = FALSE` (e.g. 0.95).
+
 - allele_sep:
 
   Separator for allele strings (default: "\|").
 
 ## Value
 
-A named list of data frames. Each data frame has columns `allele`,
-`frequency`, `count`, `total_parasites`. Names are from
-`names(target_sets)` or `"set_1"`, `"set_2"`, etc.
+A named list of data frames, one per target set. List names come from
+`names(target_sets)` or `"set_1"`, `"set_2"`, etc. Each data frame has
+the same structure as the return value of
+[`calculate_allele_frequencies`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_allele_frequencies.md):
+with MAP, columns `allele`, `frequency`, `count`, `total_parasites`;
+with MCMC, columns `allele`, `frequency`, `frequency_sd`,
+`frequency_lower`, `frequency_upper`, `mean_count`, `n_samples`, and
+attribute `mean_total_parasites`. See that function's help for the
+meaning of each column.
 
 ## Examples
 

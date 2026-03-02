@@ -38,7 +38,7 @@ load_dataframe(
 
   :   Target count (optional)
 
-  For each target, there are at exactly 2 taget values observed. If
+  For each target, there are at exactly 2 target values observed. If
   there is only one, the second value is set to unknown_target_value.
   Target count is required if model is not "categorical".
 
@@ -69,3 +69,10 @@ load_dataframe(
 ## Value
 
 Processed data list with y, r, and metadata
+
+## Details
+
+When `model == "categorical"`, long-format data.frames are handled by
+`load_dataframe_categorical`, which builds read0/read1 matrices from the
+same column layout and then converts counts to categorical observations:
+ref-only -\> 0, alt-only -\> 1, both present -\> 0.5, zero total -\> NA.

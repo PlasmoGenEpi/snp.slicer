@@ -124,10 +124,14 @@ print(D[1:3, 1:8])
 Compute allele (or haplotype) frequencies for specific SNP sets from the
 MAP or MCMC results. Use `calculate_allele_frequencies` for a single
 set; use `calculate_allele_frequencies_by_sets` for multiple sets at
-once.
+once. With MAP you get point estimates and literal counts (`allele`,
+`frequency`, `count`, `total_parasites`). With MCMC you get a posterior
+mean frequency, SD, credible interval, and per-sample mean count
+(`mean_count`, `n_samples`), so the table does not depend on how many
+MCMC samples were used.
 
 ``` r
-# Single target set: allele frequencies for SNPs 1, 5, and 10
+# Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 #>        allele  frequency count total_parasites
@@ -138,6 +142,26 @@ head(allele_freqs)
 #> 7 alt|ref|ref 0.03675048    19             517
 #> 5 alt|alt|ref 0.02514507    13             517
 
+# With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
+if (!is.null(result$mcmc_samples)) {
+  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
+  head(allele_freqs_mcmc)
+}
+#>                  allele  frequency frequency_sd frequency_lower frequency_upper
+#> ref|ref|ref ref|ref|ref 0.65713963  0.020364148      0.64025103      0.71437570
+#> ref|alt|alt ref|alt|alt 0.13666759  0.009814729      0.10973572      0.14966914
+#> alt|ref|alt alt|ref|alt 0.07438880  0.004310763      0.06658317      0.08395745
+#> ref|ref|alt ref|ref|alt 0.06019152  0.008447611      0.03980544      0.06847754
+#> alt|ref|ref alt|ref|ref 0.03728839  0.003938912      0.02994999      0.04316459
+#> alt|alt|ref alt|alt|ref 0.01476765  0.007931272      0.00000000      0.02552901
+#>             mean_count n_samples
+#> ref|ref|ref     329.82        50
+#> ref|alt|alt      68.74        50
+#> alt|ref|alt      37.36        50
+#> ref|ref|alt      30.32        50
+#> alt|ref|ref      18.74        50
+#> alt|alt|ref       7.48        50
+
 # Multiple target sets: pass a named list for one table per set
 target_sets <- list(
   locus_a = c(1, 5),
@@ -145,7 +169,7 @@ target_sets <- list(
   locus_c = c(20)
 )
 freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
-# Each element is a frequency table with columns: allele, frequency, count, total_parasites
+# Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 #>    allele  frequency count total_parasites
 #> 4 ref|ref 0.70793037   366             517
@@ -184,7 +208,7 @@ if (!is.null(result$mcmc_samples)) {
 #> 
 #> Summary of COI posterior SD:
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#> 0.00000 0.00000 0.00000 0.05691 0.00000 1.13731
+#> 0.00000 0.00000 0.00000 0.05486 0.00000 1.08965
 ```
 
 ## Running Your Own Analysis

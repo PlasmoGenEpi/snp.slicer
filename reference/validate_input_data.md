@@ -5,7 +5,7 @@ Validate input data for SNP-Slice
 ## Usage
 
 ``` r
-validate_input_data(data, model)
+validate_input_data(data, model, ...)
 ```
 
 ## Arguments
@@ -17,6 +17,11 @@ validate_input_data(data, model)
 - model:
 
   Model type to validate against
+
+- ...:
+
+  Passed through; used for column-name args when validating categorical
+  data.frames
 
 ## Value
 

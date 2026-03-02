@@ -70,7 +70,7 @@
 <dd><p>Target count (optional)</p></dd>
 
 
-</dl><p>For each target, there are at exactly 2 taget values observed. If there is only one,
+</dl><p>For each target, there are at exactly 2 target values observed. If there is only one,
 the second value is set to unknown_target_value. Target count is required if model is
 not "categorical".</p></dd>
 
@@ -102,6 +102,13 @@ not "categorical".</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Processed data list with y, r, and metadata</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>When <code>model == "categorical"</code>, long-format data.frames are handled by
+<code>load_dataframe_categorical</code>, which builds read0/read1 matrices from the same
+column layout and then converts counts to categorical observations: ref-only -&gt; 0,
+alt-only -&gt; 1, both present -&gt; 0.5, zero total -&gt; NA.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

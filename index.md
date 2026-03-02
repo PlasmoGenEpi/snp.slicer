@@ -24,8 +24,9 @@ install.packages(
 
 - **Multiple Observation Models**: Supports categorical, Poisson,
   binomial, and negative binomial models
-- **Flexible Data Input**: Accepts read count data, categorical data, or
-  file paths
+- **Flexible Data Input**: Accepts read count data, categorical data
+  (matrix or long-format data.frame with counts converted to 0/0.5/1),
+  or file paths
 - **Convergence Diagnostics**: Built-in monitoring and early stopping
 - **Comprehensive Results**: Returns allocation matrix, dictionary
   matrix, and diagnostics

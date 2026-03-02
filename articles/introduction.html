@@ -194,9 +194,14 @@ Use the extractors for convenience:</p>
 <p>Compute allele (or haplotype) frequencies for specific SNP sets from
 the MAP or MCMC results. Use <code>calculate_allele_frequencies</code>
 for a single set; use <code>calculate_allele_frequencies_by_sets</code>
-for multiple sets at once.</p>
+for multiple sets at once. With MAP you get point estimates and literal
+counts (<code>allele</code>, <code>frequency</code>, <code>count</code>,
+<code>total_parasites</code>). With MCMC you get a posterior mean
+frequency, SD, credible interval, and per-sample mean count
+(<code>mean_count</code>, <code>n_samples</code>), so the table does not
+depend on how many MCMC samples were used.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Single target set: allele frequencies for SNPs 1, 5, and 10</span></span>
+<code class="sourceCode R"><span><span class="co"># Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)</span></span>
 <span><span class="va">allele_freqs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        allele  frequency count total_parasites</span></span>
@@ -207,6 +212,26 @@ for multiple sets at once.</p>
 <span><span class="co">#&gt; 7 alt|ref|ref 0.03675048    19             517</span></span>
 <span><span class="co">#&gt; 5 alt|alt|ref 0.02514507    13             517</span></span>
 <span></span>
+<span><span class="co"># With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">allele_freqs_mcmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, use_map <span class="op">=</span> <span class="cn">FALSE</span>, n_samples <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs_mcmc</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="co">#&gt;                  allele  frequency frequency_sd frequency_lower frequency_upper</span></span>
+<span><span class="co">#&gt; ref|ref|ref ref|ref|ref 0.65713963  0.020364148      0.64025103      0.71437570</span></span>
+<span><span class="co">#&gt; ref|alt|alt ref|alt|alt 0.13666759  0.009814729      0.10973572      0.14966914</span></span>
+<span><span class="co">#&gt; alt|ref|alt alt|ref|alt 0.07438880  0.004310763      0.06658317      0.08395745</span></span>
+<span><span class="co">#&gt; ref|ref|alt ref|ref|alt 0.06019152  0.008447611      0.03980544      0.06847754</span></span>
+<span><span class="co">#&gt; alt|ref|ref alt|ref|ref 0.03728839  0.003938912      0.02994999      0.04316459</span></span>
+<span><span class="co">#&gt; alt|alt|ref alt|alt|ref 0.01476765  0.007931272      0.00000000      0.02552901</span></span>
+<span><span class="co">#&gt;             mean_count n_samples</span></span>
+<span><span class="co">#&gt; ref|ref|ref     329.82        50</span></span>
+<span><span class="co">#&gt; ref|alt|alt      68.74        50</span></span>
+<span><span class="co">#&gt; alt|ref|alt      37.36        50</span></span>
+<span><span class="co">#&gt; ref|ref|alt      30.32        50</span></span>
+<span><span class="co">#&gt; alt|ref|ref      18.74        50</span></span>
+<span><span class="co">#&gt; alt|alt|ref       7.48        50</span></span>
+<span></span>
 <span><span class="co"># Multiple target sets: pass a named list for one table per set</span></span>
 <span><span class="va">target_sets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  locus_a <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span>,</span>
@@ -214,7 +239,7 @@ for multiple sets at once.</p>
 <span>  locus_c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">freqs_by_set</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies_by_sets.html">calculate_allele_frequencies_by_sets</a></span><span class="op">(</span><span class="va">result</span>, <span class="va">target_sets</span><span class="op">)</span></span>
-<span><span class="co"># Each element is a frequency table with columns: allele, frequency, count, total_parasites</span></span>
+<span><span class="co"># Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">freqs_by_set</span><span class="op">$</span><span class="va">locus_a</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    allele  frequency count total_parasites</span></span>
 <span><span class="co">#&gt; 4 ref|ref 0.70793037   366             517</span></span>
@@ -251,7 +276,7 @@ SD, and a credible interval.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Summary of COI posterior SD:</span></span>
 <span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
-<span><span class="co">#&gt; 0.00000 0.00000 0.00000 0.05691 0.00000 1.13731</span></span></code></pre></div>
+<span><span class="co">#&gt; 0.00000 0.00000 0.00000 0.05486 0.00000 1.08965</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">

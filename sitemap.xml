@@ -19,6 +19,7 @@
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/categorical_loglikelihood_vector.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/categorical_resolve_exceptions.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/clear_performance_log.html</loc></url>
+<url><loc>https://plasmogenepi.github.io/snp.slicer/reference/counts_to_categorical.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/create_model.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/create_results_object.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/effective_sample_size.html</loc></url>
@@ -37,6 +38,7 @@
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/index.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/init_performance_tracking.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/load_dataframe.html</loc></url>
+<url><loc>https://plasmogenepi.github.io/snp.slicer/reference/load_dataframe_categorical.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/load_example_results.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/logf_newfeature.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/logf_oldfeature.html</loc></url>
@@ -74,6 +76,7 @@
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/slice_update_s.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/start_timer.html</loc></url>
+<url><loc>https://plasmogenepi.github.io/snp.slicer/reference/summarize_allele_frequencies_mcmc.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/summary.snp_slice_results.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/validate_input_data.html</loc></url>
 <url><loc>https://plasmogenepi.github.io/snp.slicer/reference/validate_mcmc_settings.html</loc></url>

@@ -39,7 +39,12 @@ snp_slice_negative_binomial(data, ...)
 
   Input data. Can be a matrix, data.frame, or file path. For read count
   data, should be a list with elements `read1` and `read0` (or `total`).
-  For categorical data, should be a matrix with values 0, 0.5, or 1.
+  For categorical data, can be a matrix with values 0, 0.5, or 1; or a
+  long-format data.frame with columns `specimen_id`, `target_id`,
+  `target_value`, and `target_count`. For a categorical data.frame,
+  counts are converted to categories: ref-only -\> 0, alt-only -\> 1,
+  both present -\> 0.5, zero total -\> NA. Matrix and categorical file
+  inputs (e.g. `*_cat.txt`) remain supported.
 
 - model:
 

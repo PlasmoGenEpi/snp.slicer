@@ -1,10 +1,5 @@
 # Calculate Allele Frequencies from MCMC Results
 
-Calculates allele frequencies for a collection of SNPs treated as a
-single allele. The function takes SNP indices and calculates the
-frequency of each possible allele combination across all individuals
-based on their strain allocations.
-
 ## Usage
 
 ``` r
@@ -13,6 +8,7 @@ calculate_allele_frequencies(
   snp_indices,
   use_map = TRUE,
   n_samples = 100,
+  interval = 0.95,
   allele_sep = "|"
 )
 ```
@@ -36,46 +32,46 @@ calculate_allele_frequencies(
 
   Number of MCMC samples to use if use_map = FALSE (default: 100)
 
+- interval:
+
+  Numeric in (0, 1). Credible interval width when using MCMC (e.g.
+  0.95).
+
 - allele_sep:
 
   Separator for allele strings (default: "\|")
 
 ## Value
 
-A data frame with columns:
+The structure depends on `use_map`.
 
-- allele:
+- MAP (`use_map = TRUE`):
 
-  String representation of the allele (e.g., "A\|T\|T" for 3 SNPs)
+  Data frame with columns: `allele` (string representation of the
+  allele, e.g. `"ref|alt|ref"` for 3 SNPs), `frequency` (proportion of
+  total parasites with this allele; sums to 1), `count` (number of
+  parasites with this allele in the MAP allocation), `total_parasites`
+  (total parasites in the MAP allocation; same for every row).
 
-- frequency:
+- MCMC (`use_map = FALSE`):
 
-  Proportion of total parasites with this allele
+  Data frame with columns: `allele`, `frequency` (posterior mean
+  proportion), `frequency_sd` (posterior SD of proportion across
+  samples), `frequency_lower` and `frequency_upper` (credible interval,
+  e.g. 2.5\\
 
-- count:
-
-  Absolute count of parasites with this allele
-
-- total_parasites:
-
-  Total number of parasites across all individuals
-
-## Examples
-
-``` r
-# Load example results
-result <- load_example_results()
-
-# Calculate allele frequencies for SNPs 1, 5, and 10
-allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
-print(allele_freqs)
-#>        allele   frequency count total_parasites
-#> 8 ref|ref|ref 0.642166344   332             517
-#> 2 ref|alt|alt 0.148936170    77             517
-#> 3 alt|ref|alt 0.073500967    38             517
-#> 4 ref|ref|alt 0.065764023    34             517
-#> 7 alt|ref|ref 0.036750484    19             517
-#> 5 alt|alt|ref 0.025145068    13             517
-#> 6 ref|alt|ref 0.007736944     4             517
-#> 1 alt|alt|alt 0.000000000     0             517
-```
+Calculates allele frequencies for a collection of SNPs treated as a
+single allele. The function takes SNP indices and calculates the
+frequency of each possible allele combination across all individuals
+based on their strain allocations. With `use_map = FALSE`, counts are
+summarized as per-sample means rather than sums, so `mean_count` and
+`mean_total_parasites` are interpretable regardless of `n_samples`.
+Frequency uncertainty (`frequency_sd`, `frequency_lower`,
+`frequency_upper`) is computed from the distribution of allele
+frequencies across MCMC samples. \# Load example results result \<-
+load_example_results()# Calculate allele frequencies for SNPs 1, 5, and
+10 (MAP) allele_freqs \<- calculate_allele_frequencies(result, c(1, 5,
+10)) print(allele_freqs)# With MCMC: posterior mean, SD, credible
+interval, and per-sample mean count if (!is.null(result\$mcmc_samples))
+allele_freqs_mcmc \<- calculate_allele_frequencies(result, c(1, 5, 10),
+use_map = FALSE, n_samples = 50) print(allele_freqs_mcmc)

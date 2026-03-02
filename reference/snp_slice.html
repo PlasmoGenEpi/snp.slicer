@@ -79,7 +79,11 @@ unveils strain haplotypes and links them to hosts from sequencing data.</p>
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>Input data. Can be a matrix, data.frame, or file path. For read count data,
 should be a list with elements <code>read1</code> and <code>read0</code> (or <code>total</code>). For categorical data,
-should be a matrix with values 0, 0.5, or 1.</p></dd>
+can be a matrix with values 0, 0.5, or 1; or a long-format data.frame with columns
+<code>specimen_id</code>, <code>target_id</code>, <code>target_value</code>, and <code>target_count</code>.
+For a categorical data.frame, counts are converted to categories: ref-only -&gt; 0,
+alt-only -&gt; 1, both present -&gt; 0.5, zero total -&gt; NA. Matrix and categorical file
+inputs (e.g. <code>*_cat.txt</code>) remain supported.</p></dd>
 
 
 <dt id="arg-model">model<a class="anchor" aria-label="anchor" href="#arg-model"></a></dt>
