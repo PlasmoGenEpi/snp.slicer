@@ -30,28 +30,33 @@ validate_input_data <- function(data, model, ...) {
   }
 
   if (is.data.frame(data)) {
-    if (model == "categorical") {
-      params <- list(
-        target_id_col = "target_id",
-        target_value_col = "target_value",
-        specimen_id_col = "specimen_id",
-        target_count_col = "target_count"
-      )
-      overrides <- list(...)
-      for (nm in names(overrides)) if (nm %in% names(params)) params[[nm]] <- overrides[[nm]]
-      required <- c(params$target_id_col, params$target_value_col, params$specimen_id_col, params$target_count_col)
-      missing <- setdiff(required, names(data))
-      if (length(missing) > 0) {
-        stop("Categorical data.frame must have columns: ", paste(required, collapse = ", "), "; missing: ", paste(missing, collapse = ", "))
-      }
-      if (nrow(data) == 0) {
-        stop("Categorical data.frame cannot be empty")
-      }
-      count_col <- params$target_count_col
-      if (is.numeric(data[[count_col]]) && any(data[[count_col]] < 0, na.rm = TRUE)) {
-        stop("target_count cannot be negative")
-      }
+    params <- list(
+      target_id_col = "target_id",
+      target_value_col = "target_value",
+      specimen_id_col = "specimen_id",
+      target_count_col = "target_count"
+    )
+    overrides <- list(...)
+    for (nm in names(overrides)) if (nm %in% names(params)) params[[nm]] <- overrides[[nm]]
+
+    # All long-format data.frames (categorical and count) need the same four columns.
+    # Categorical uses target_count too: counts_to_categorical derives 0/0.5/1/NA from
+    # whether each allele's summed count is > 0.
+    required <- c(params$target_id_col, params$target_value_col, params$specimen_id_col, params$target_count_col)
+    missing <- setdiff(required, names(data))
+    if (length(missing) > 0) {
+      stop("Long-format data.frame must have columns: ", paste(required, collapse = ", "), "; missing: ", paste(missing, collapse = ", "))
     }
+    if (nrow(data) == 0) {
+      stop("Long-format data.frame cannot be empty")
+    }
+    count_col <- params$target_count_col
+    if (is.numeric(data[[count_col]]) && any(data[[count_col]] < 0, na.rm = TRUE)) {
+      stop("target_count cannot be negative")
+    }
+
+    # Structural checks shared by all long-format data.frames (categorical or count)
+    validate_long_dataframe(data, params)
     return(TRUE)
   }
 
@@ -110,6 +115,42 @@ validate_input_data <- function(data, model, ...) {
   }
 
   stop("Unsupported data type. Expected matrix, data.frame, list, or file path")
+}
+
+#' Structural validation for long-format data.frames
+#'
+#' Checks shared by every long-format input (categorical and count models): each
+#' allele must appear at most once per specimen and target, and at least one
+#' target must be biallelic (exactly two observed alleles) so the model has
+#' variation to resolve strains. Monomorphic targets are allowed alongside
+#' biallelic ones; targets with more than two alleles are dropped downstream by
+#' \code{\link{load_dataframe}}. The caller (\code{\link{validate_input_data}})
+#' guarantees the key columns are present before this is called.
+#'
+#' @param data Long-format data.frame.
+#' @param params List of resolved column names with elements
+#'   \code{specimen_id_col}, \code{target_id_col}, \code{target_value_col}.
+#' @return Invisibly \code{TRUE}; otherwise throws an error.
+#' @keywords internal
+validate_long_dataframe <- function(data, params) {
+  sid <- params$specimen_id_col
+  tid <- params$target_id_col
+  tval <- params$target_value_col
+
+  # No duplicate allele rows: each (specimen, target, value) at most once.
+  if (anyDuplicated(data[, c(sid, tid, tval), drop = FALSE]) > 0) {
+    stop("Input data contains duplicate (", sid, ", ", tid, ", ", tval,
+         ") rows; each allele must appear at most once per specimen and target")
+  }
+
+  # At least one biallelic locus (exactly two observed alleles) must survive the
+  # downstream <=2-allele filter, or there is no variation to model.
+  alleles_per_target <- tapply(data[[tval]], data[[tid]], function(v) length(unique(v)))
+  if (length(alleles_per_target) == 0 || !any(alleles_per_target == 2)) {
+    stop("Input data has no biallelic loci (targets with exactly two observed alleles)")
+  }
+
+  invisible(TRUE)
 }
 
 #' Validate algorithm parameters
