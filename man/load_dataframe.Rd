@@ -7,7 +7,6 @@
 load_dataframe(
   data,
   model,
-  unknown_target_value = "?",
   target_id_col = "target_id",
   target_value_col = "target_value",
   specimen_id_col = "specimen_id",
@@ -19,16 +18,14 @@ load_dataframe(
 \describe{
 \item{specimen_id}{Specimen ID}
 \item{target_id}{Target ID}
-\item{target_value}{Target value}
-\item{target_count}{Target count (optional)}
+\item{target_value}{Target value (allele)}
+\item{target_count}{Target count}
 }
-For each target, there are at exactly 2 target values observed. If there is only one,
-the second value is set to unknown_target_value. Target count is required if model is
-not "categorical".}
+Input is assumed to have passed \code{\link{validate_input_data}}: the four
+columns are present, no \code{(specimen, target, value)} row is duplicated, and
+at least one target is biallelic.}
 
 \item{model}{Model type}
-
-\item{unknown_target_value}{Value to use for unknown targets}
 
 \item{target_id_col}{Name of the target ID column}
 
@@ -45,9 +42,16 @@ Processed data list with y, r, and metadata
 Load data from a dataframe
 }
 \details{
+Each target is assigned an ordered allele pair: slot 1 (read0) is the
+lexicographically larger allele, slot 2 (read1) the other. Monomorphic targets
+have only one observed allele, so both slots carry that same label and read1 is a
+structural zero (no second allele was observed). A specimen with no reads at a
+target (total count 0) is encoded as \code{NA} for both slots, distinguishing a
+missing genotype from a homozygous call.
+
 When \code{model == "categorical"}, long-format data.frames are handled by
 \code{load_dataframe_categorical}, which builds read0/read1 matrices from the same
-column layout and then converts counts to categorical observations: ref-only -> 0,
+layout and then converts counts to categorical observations: ref-only -> 0,
 alt-only -> 1, both present -> 0.5, zero total -> NA.
 }
 \keyword{internal}

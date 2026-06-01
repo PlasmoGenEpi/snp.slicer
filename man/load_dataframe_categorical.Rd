@@ -7,7 +7,6 @@
 load_dataframe_categorical(
   data,
   model,
-  unknown_target_value = "?",
   target_id_col = "target_id",
   target_value_col = "target_value",
   specimen_id_col = "specimen_id",
@@ -20,7 +19,7 @@ load_dataframe_categorical(
 
 \item{model}{Model type (must be \code{"categorical"}).}
 
-\item{unknown_target_value, target_id_col, target_value_col, specimen_id_col, target_count_col}{Same as \code{\link{load_dataframe}}.}
+\item{target_id_col, target_value_col, specimen_id_col, target_count_col}{Same as \code{\link{load_dataframe}}.}
 }
 \value{
 Processed data list with \code{data_type = "categorical"}, \code{y} the categorical
