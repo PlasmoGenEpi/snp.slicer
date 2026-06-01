@@ -167,8 +167,8 @@ validate_parameters <- function(alpha, rho, threshold) {
     stop("alpha must be a positive number")
   }
   
-  if (!is.numeric(rho) || rho < 0 || rho > 1) {
-    stop("rho must be a number between 0 and 1")
+  if ((!is.numeric(rho) || rho < 0 || rho > 1) && rho != "MAF") {
+    stop("rho must be a number between 0 and 1 or 'MAF'")
   }
   
   if (!is.numeric(threshold) || threshold < 0 || threshold > 1) {
@@ -280,13 +280,20 @@ load_dataframe <- function(
     dplyr::select(target_id, target_value, specimen_id, target_count)
 
   # Order alleles per target, remove loci with more than two alleles, 
-  # and assign arbitrary target indices
+  # and assign target indices
   target_alleles <- data_renamed |>
-    dplyr::distinct(target_id, target_value) |>
+    dplyr::group_by(target_id, target_value) |>
+    dplyr::summarize(total_count = sum(target_count), .groups = "drop") |>
     dplyr::group_by(target_id) |>
     dplyr::filter(dplyr::n() <= 2) |>
-    dplyr::arrange(dplyr::desc(target_value), .by_group = TRUE) |>
+    dplyr::arrange(
+      # SNP-Slice assumes the minor allele is in the first slot
+      if (model != "categorical") total_count else 0, 
+      dplyr::desc(target_value), 
+      .by_group = TRUE
+    ) |>
     dplyr::mutate(target_idx = dplyr::row_number()) |>
+    dplyr::select(-total_count) |>
     dplyr::ungroup()
 
   # Pivot

@@ -19,7 +19,8 @@ test_that("load_dataframe duplicates the allele label for monomorphic loci (no '
   expect_equal(out$r0_values[t2], "G")
   expect_equal(out$r1_values[t2], "G")
 
-  # Biallelic locus keeps descending order: slot 1 (read0) is the larger string.
+  # Biallelic locus is oriented by frequency: slot 1 (read0 / y) is the MINOR
+  # allele. Here T (total 3) is the minor allele and A (total 9) the major.
   expect_equal(out$r0_values[t1], "T")
   expect_equal(out$r1_values[t1], "A")
 
