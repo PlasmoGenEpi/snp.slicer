@@ -4,6 +4,43 @@
 #' Implementation of the categorical observation model for SNP-Slice.
 #' This model handles categorical observations (0, 0.5, 1) with error parameters.
 
+#' Build categorical log-likelihood lookup table
+#'
+#' @param e1 False-positive error rate
+#' @param e2 False-negative / mixture error rate
+#' @return 3x3 matrix: rows = proportion bins, cols = observation bins
+#' @keywords internal
+build_categorical_llik_tab <- function(e1, e2) {
+  logf0 <- log(c(1 - e1, e1, 0))
+  logf1 <- log(c(0, e1, 1 - e1))
+  logfmix <- log(c(e2 / 2, 1 - e2, e2 / 2))
+  rbind(logf0, logfmix, logf1)
+}
+
+#' Map proportion to lookup-table row (1-based)
+#' @keywords internal
+categorical_prop_bin <- function(prop) {
+  if (prop <= 0) {
+    1L
+  } else if (prop <= 0.99) {
+    2L
+  } else {
+    3L
+  }
+}
+
+#' Map observation to lookup-table column (1-based)
+#' @keywords internal
+categorical_y_bin <- function(y) {
+  if (y == 0) {
+    1L
+  } else if (y == 0.5) {
+    2L
+  } else {
+    3L
+  }
+}
+
 #' Log-likelihood for categorical model (matrix version)
 #'
 #' @param A Allocation matrix
@@ -14,17 +51,20 @@
 #' @keywords internal
 categorical_loglikelihood_matrix <- function(A, D, model_obj) {
   start_timer("categorical_loglikelihood_matrix")
-  
-  # Calculate proportions
+
   proportions <- (A %*% D) / rowSums(A)
-  
-  # Categorical likelihood using likelihood table
-  loglik <- sum(sapply(1:model_obj$P, function(p) {
-    categorical_loglikelihood_vector(proportions[, p], model_obj$y[, p])
-  }))
-  
+  llik_tab <- model_obj$llik_tab
+  loglik <- 0
+  for (p in seq_len(model_obj$P)) {
+    loglik <- loglik + categorical_loglikelihood_vector(
+      proportions[, p],
+      model_obj$y[, p],
+      llik_tab = llik_tab
+    )
+  }
+
   end_timer("categorical_loglikelihood_matrix")
-  return(loglik)
+  as.numeric(loglik)
 }
 
 #' Log-likelihood for categorical model (vector version)
@@ -35,31 +75,23 @@ categorical_loglikelihood_matrix <- function(A, D, model_obj) {
 #'
 #' @return Log-likelihood value
 #' @keywords internal
-categorical_loglikelihood_vector <- function(propvec, yvec, rvec = NULL) {
-  start_timer("categorical_loglikelihood_vector")
-  
-  # Create likelihood table based on error parameters
-  e1 <- 0.05  # Will be passed from model object in full implementation
-  e2 <- 0.05
-  
-  logf0 <- log(c(1 - e1, e1, 0))
-  logf1 <- log(c(0, e1, 1 - e1))
-  logfmix <- log(c(e2/2, 1 - e2, e2/2))
-  
-  llik_tab <- matrix(0, nrow = 3, ncol = 3)
-  llik_tab[1, ] <- logf0
-  llik_tab[2, ] <- logfmix
-  llik_tab[3, ] <- logf1
-  
-  # Convert proportions to categorical
-  propvec_cat <- cut(propvec, c(-Inf, 0, 0.99, 1.1), labels = c(0, 0.5, 1))
-  yvec_cat <- factor(yvec, levels = c(0, 0.5, 1))
-  
-  # Calculate log-likelihood
-  loglik <- sum(table(propvec_cat, yvec_cat) * llik_tab, na.rm = TRUE)
-  
-  end_timer("categorical_loglikelihood_vector")
-  return(loglik)
+categorical_loglikelihood_vector <- function(propvec, yvec, rvec = NULL, llik_tab = NULL) {
+  if (is.null(llik_tab)) {
+    llik_tab <- build_categorical_llik_tab(0.05, 0.05)
+  }
+
+  loglik <- 0
+  for (idx in seq_along(propvec)) {
+    y_val <- yvec[idx]
+    if (is.na(y_val)) {
+      next
+    }
+    pb <- categorical_prop_bin(propvec[idx])
+    yb <- categorical_y_bin(y_val)
+    loglik <- loglik + llik_tab[pb, yb]
+  }
+
+  as.numeric(loglik)
 }
 
 #' Initialize state for categorical model
