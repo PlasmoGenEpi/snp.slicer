@@ -8,8 +8,11 @@
 #' caches (\code{kernel_loglik_const}, \code{kernel_obs_code}) are built
 #' automatically on first use (\code{resolve_mcmc_kernel}, \code{slice_iter}).
 #'
+#' @useDynLib snp.slicer, .registration = TRUE
 #' @import Rcpp
+#' @name mcmc_kernel
 #' @keywords internal
+NULL
 
 NULL_LLIK_TAB <- matrix(0, nrow = 3, ncol = 3)
 
