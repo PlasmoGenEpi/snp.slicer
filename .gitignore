@@ -16,6 +16,19 @@
 *.tar.gz
 *.zip
 *.pdf
+check/
+
+# Local dev install (e.g. R_LIBS_USER=.R_libs)
+.R_libs/
+
+# Rcpp / native code build artifacts
+src/*.o
+src/*.so
+src/*.dll
+src/symbols.rds
+
+# Profiling outputs (scripts/profile_*.sh, profile_kernel.R)
+profile/
 
 # Temporary files
 *.tmp
