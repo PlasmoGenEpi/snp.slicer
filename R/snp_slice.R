@@ -17,7 +17,7 @@
 #' @param n_mcmc Number of MCMC iterations (default: 10000).
 #' @param burnin Burn-in period. If NULL, defaults to n_mcmc/2.
 #' @param alpha IBP concentration parameter (default: 2.6).
-#' @param rho Dictionary sparsity parameter (default: 0.5 for categorical model and the global minor allele frequency otherwise)
+#' @param rho Dictionary sparsity parameter (default: 0.5 for categorical model and NULL otherwise, which means use the global minor allele frequency)
 #' @param threshold Threshold for identifying single infections (default: 0.001).
 #' @param gap Early stopping threshold. If NULL, runs for full n_mcmc iterations.
 #' @param seed Random seed for reproducibility.
@@ -58,7 +58,7 @@ snp_slice <- function(data,
                       n_mcmc = 10000,
                       burnin = NULL,
                       alpha = 2.6,
-                      rho = ifelse(model == "categorical", 0.5, "MAF"), 
+                      rho = if (model == "categorical") 0.5 else NULL,
                       threshold = 0.001,
                       gap = NULL,
                       seed = NULL,

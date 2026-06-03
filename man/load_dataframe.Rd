@@ -42,16 +42,21 @@ Processed data list with y, r, and metadata
 Load data from a dataframe
 }
 \details{
-Each target is assigned an ordered allele pair: slot 1 (read0) is the
-lexicographically larger allele, slot 2 (read1) the other. Monomorphic targets
-have only one observed allele, so both slots carry that same label and read1 is a
-structural zero (no second allele was observed). A specimen with no reads at a
-target (total count 0) is encoded as \code{NA} for both slots, distinguishing a
-missing genotype from a homozygous call.
+The alleles for each target are sorted and given indices such that
+target_idx 1 (read0) is the minor allele and target_idx 2 (read1)
+the major. For monomorphic targets, with only one observed allele, both
+slots carry that same label and read1 is zero (because no second allele
+was observed). A specimen with no reads at a target (i.e., total_count 0)
+is encoded as \code{NA} for both slots, thus distinguishing a missing
+genotype from a homozygous call.
 
 When \code{model == "categorical"}, long-format data.frames are handled by
 \code{load_dataframe_categorical}, which builds read0/read1 matrices from the same
-layout and then converts counts to categorical observations: ref-only -> 0,
-alt-only -> 1, both present -> 0.5, zero total -> NA.
+layout and then converts counts to categorical observations.  For categorical
+data the allele order is determined by descending \code{target_value} (not by
+count), so the lexicographically larger allele label occupies target_idx 1
+(read0).  A specimen observed with only that allele yields \code{y = 0}, with
+only the other allele \code{y = 1}, with both \code{y = 0.5}, and with no reads
+\code{y = NA}.
 }
 \keyword{internal}

@@ -10,13 +10,15 @@ create_model <- function(
                          model, 
                          processed_data, 
                          alpha = 2.6, 
-                         rho = ifelse(model == "categorical", 0.5, "MAF"), 
+                         rho = ifelse(model == "categorical", 0.5, NULL), 
                          ...) {
   
   # Extract additional parameters
   params <- list(...)
-  if (rho == "MAF") {
-    rho <- sum(processed_data$y, na.rm = TRUE) / sum(processed_data$r, na.rm = TRUE)
+  if (is.null(rho)) {
+    polymorphic_obs <- !is.na(processed_data$y) & processed_data$y != processed_data$r
+    rho <- sum(processed_data$y[polymorphic_obs], na.rm = TRUE) /
+      sum(processed_data$r[polymorphic_obs], na.rm = TRUE)
   }
   
   # Create model-specific object

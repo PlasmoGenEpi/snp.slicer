@@ -136,6 +136,7 @@ validate_long_dataframe <- function(data, params) {
   sid <- params$specimen_id_col
   tid <- params$target_id_col
   tval <- params$target_value_col
+  tcol <- params$target_count_col
 
   # No duplicate allele rows: each (specimen, target, value) at most once.
   if (anyDuplicated(data[, c(sid, tid, tval), drop = FALSE]) > 0) {
@@ -148,6 +149,14 @@ validate_long_dataframe <- function(data, params) {
   alleles_per_target <- tapply(data[[tval]], data[[tid]], function(v) length(unique(v)))
   if (length(alleles_per_target) == 0 || !any(alleles_per_target == 2)) {
     stop("Input data has no biallelic loci (targets with exactly two observed alleles)")
+  }
+
+  # At least one biallelic locus must have positive total reads
+  biallelic_targets <- names(alleles_per_target)[alleles_per_target == 2]
+  biallelic_rows <- data[[tid]] %in% biallelic_targets
+  total_by_biallelic <- tapply(data[[tcol]][biallelic_rows], data[[tid]][biallelic_rows], sum, na.rm = TRUE)
+  if (!any(total_by_biallelic > 0)) {
+    stop("All biallelic loci have zero or missing total reads")
   }
 
   invisible(TRUE)
@@ -167,8 +176,8 @@ validate_parameters <- function(alpha, rho, threshold) {
     stop("alpha must be a positive number")
   }
   
-  if ((!is.numeric(rho) || rho < 0 || rho > 1) && rho != "MAF") {
-    stop("rho must be a number between 0 and 1 or 'MAF'")
+  if (!is.null(rho) && (!is.numeric(rho) || rho < 0 || rho > 1)) {
+    stop("rho must be a number between 0 and 1")
   }
   
   if (!is.numeric(threshold) || threshold < 0 || threshold > 1) {
@@ -255,8 +264,8 @@ counts_to_categorical <- function(read0, read1) {
 #' @return Processed data list with y, r, and metadata
 #'
 #' @details The alleles for each target are sorted and given indices such that 
-#'   target_idx 1 (read0) is the lexicographically larger allele and target_idx 2 (read1) 
-#'   the other. For monomorphic targets, with only one observed allele, both 
+#'   target_idx 1 (read0) is the minor allele and target_idx 2 (read1) 
+#'   the major. For monomorphic targets, with only one observed allele, both 
 #'   slots carry that same label and read1 is zero (because no second allele 
 #'   was observed). A specimen with no reads at a target (i.e., total_count 0) 
 #'   is encoded as \code{NA} for both slots, thus distinguishing a missing 
@@ -264,8 +273,12 @@ counts_to_categorical <- function(read0, read1) {
 #'
 #'   When \code{model == "categorical"}, long-format data.frames are handled by
 #'   \code{load_dataframe_categorical}, which builds read0/read1 matrices from the same
-#'   layout and then converts counts to categorical observations: ref-only -> 0,
-#'   alt-only -> 1, both present -> 0.5, zero total -> NA.
+#'   layout and then converts counts to categorical observations.  For categorical
+#'   data the allele order is determined by descending \code{target_value} (not by
+#'   count), so the lexicographically larger allele label occupies target_idx 1
+#'   (read0).  A specimen observed with only that allele yields \code{y = 0}, with
+#'   only the other allele \code{y = 1}, with both \code{y = 0.5}, and with no reads
+#'   \code{y = NA}.
 #'
 #' @keywords internal
 load_dataframe <- function(
