@@ -8,7 +8,6 @@ Load data from a dataframe
 load_dataframe(
   data,
   model,
-  unknown_target_value = "?",
   target_id_col = "target_id",
   target_value_col = "target_value",
   specimen_id_col = "specimen_id",
@@ -32,23 +31,20 @@ load_dataframe(
 
   target_value
 
-  :   Target value
+  :   Target value (allele)
 
   target_count
 
-  :   Target count (optional)
+  :   Target count
 
-  For each target, there are at exactly 2 target values observed. If
-  there is only one, the second value is set to unknown_target_value.
-  Target count is required if model is not "categorical".
+  Input is assumed to have passed
+  [`validate_input_data`](https://plasmogenepi.github.io/snp.slicer/reference/validate_input_data.md):
+  the four columns are present, no `(specimen, target, value)` row is
+  duplicated, and at least one target is biallelic.
 
 - model:
 
   Model type
-
-- unknown_target_value:
-
-  Value to use for unknown targets
 
 - target_id_col:
 
@@ -72,7 +68,19 @@ Processed data list with y, r, and metadata
 
 ## Details
 
+The alleles for each target are sorted and given indices such that
+target_idx 1 (read0) is the minor allele and target_idx 2 (read1) the
+major. For monomorphic targets, with only one observed allele, both
+slots carry that same label and read1 is zero (because no second allele
+was observed). A specimen with no reads at a target (i.e., total_count
+0) is encoded as `NA` for both slots, thus distinguishing a missing
+genotype from a homozygous call.
+
 When `model == "categorical"`, long-format data.frames are handled by
 `load_dataframe_categorical`, which builds read0/read1 matrices from the
-same column layout and then converts counts to categorical observations:
-ref-only -\> 0, alt-only -\> 1, both present -\> 0.5, zero total -\> NA.
+same layout and then converts counts to categorical observations. For
+categorical data the allele order is determined by descending
+`target_value` (not by count), so the lexicographically larger allele
+label occupies target_idx 1 (read0). A specimen observed with only that
+allele yields `y = 0`, with only the other allele `y = 1`, with both
+`y = 0.5`, and with no reads `y = NA`.

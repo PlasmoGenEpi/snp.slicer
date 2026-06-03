@@ -5,7 +5,13 @@ Create model object
 ## Usage
 
 ``` r
-create_model(model, processed_data, alpha = 2.6, rho = 0.5, ...)
+create_model(
+  model,
+  processed_data,
+  alpha = 2.6,
+  rho = ifelse(model == "categorical", 0.5, NULL),
+  ...
+)
 ```
 
 ## Arguments

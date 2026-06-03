@@ -14,7 +14,7 @@ snp_slice(
   n_mcmc = 10000,
   burnin = NULL,
   alpha = 2.6,
-  rho = 0.5,
+  rho = if (model == "categorical") 0.5 else NULL,
   threshold = 0.001,
   gap = NULL,
   seed = NULL,
@@ -65,7 +65,8 @@ snp_slice_negative_binomial(data, ...)
 
 - rho:
 
-  Dictionary sparsity parameter (default: 0.5).
+  Dictionary sparsity parameter (default: 0.5 for categorical model and
+  NULL otherwise, which means use the global minor allele frequency)
 
 - threshold:
 

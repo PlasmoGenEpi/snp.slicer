@@ -13,6 +13,7 @@ binomial model using real example data.
 ## Installation
 
 ``` r
+
 # Install from CRAN (when available)
 install.packages("snp.slicer")
 
@@ -25,6 +26,7 @@ devtools::install_github("plasmogenepi/snp.slice")
 Load the package, example data, and pre-computed results:
 
 ``` r
+
 library(snp.slicer)
 
 # Example data: read count matrices (hosts × SNPs)
@@ -81,6 +83,7 @@ The main outputs are the **allocation matrix** (hosts × strains) and the
 convenience:
 
 ``` r
+
 # Strain and allocation summaries
 strains <- extract_strains(result)
 allocations <- extract_allocations(result)
@@ -131,6 +134,7 @@ mean frequency, SD, credible interval, and per-sample mean count
 MCMC samples were used.
 
 ``` r
+
 # Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
@@ -187,6 +191,7 @@ for a point estimate (MAP) or, when MCMC samples were stored, posterior
 mean, SD, and a credible interval.
 
 ``` r
+
 # Point estimate only (from MAP allocation)
 coi_map <- calculate_individual_coi(result, use_map = TRUE)
 head(coi_map)
@@ -216,6 +221,7 @@ if (!is.null(result$mcmc_samples)) {
 If you want to run the analysis yourself, here’s how to do it:
 
 ``` r
+
 # Run SNP-Slice with the negative binomial model
 data <- list(read0 = read0, read1 = read1)
 result <- snp_slice(data, 
@@ -230,6 +236,7 @@ result <- snp_slice(data,
 You can adjust various parameters to optimize performance:
 
 ``` r
+
 # Custom parameters
 result_tuned <- snp_slice(data,
                          alpha = 1.5,        # IBP concentration parameter
@@ -248,6 +255,7 @@ When you store MCMC samples (`store_mcmc = TRUE`), you can assess
 convergence with effective sample size (ESS) and trace plots:
 
 ``` r
+
 if (!is.null(result$mcmc_samples)) {
   # Effective sample size for log posterior
   ess_logpost <- effective_sample_size(result, parameter = "logpost")
@@ -281,6 +289,7 @@ results:
 ### Multiplicity of Infection (MOI) Distribution
 
 ``` r
+
 # Get MOI from allocations (same as strain diversity)
 allocations <- extract_allocations(result)
 moi_df <- data.frame(
@@ -314,6 +323,7 @@ line.](introduction_files/figure-html/unnamed-chunk-10-1.png)
 ### Strain Frequency Analysis
 
 ``` r
+
 # Calculate strain frequencies
 strain_frequencies <- colSums(A)
 freq_df <- data.frame(
@@ -345,6 +355,7 @@ per strain).](introduction_files/figure-html/unnamed-chunk-11-1.png)
 ### Strain Pattern Heatmap
 
 ``` r
+
 # Create a heatmap of the first 20 strains and first 30 SNPs
 D_subset <- D[1:min(20, nrow(D)), 1:min(30, ncol(D))]
 
@@ -383,6 +394,7 @@ alternative.](introduction_files/figure-html/unnamed-chunk-12-1.png)
 ### Host-Strain Allocation Heatmap
 
 ``` r
+
 # Create a heatmap of host-strain allocations (first 50 hosts, first 20 strains)
 A_subset <- A[1:min(50, nrow(A)), 1:min(20, ncol(A))]
 
@@ -421,6 +433,7 @@ strength.](introduction_files/figure-html/unnamed-chunk-13-1.png)
 ### Summary Statistics
 
 ``` r
+
 # Create summary statistics
 summary_stats <- data.frame(
   Metric = c(
@@ -459,7 +472,7 @@ knitr::kable(summary_stats,
 | Single Infections   | 105.00 |
 | Multiple Infections |  95.00 |
 
-Summary Statistics from SNP-Slice Analysis
+Summary Statistics from SNP-Slice Analysis {.table}
 
 ## Next steps
 

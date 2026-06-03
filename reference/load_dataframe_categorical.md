@@ -12,7 +12,6 @@ observations (0, 0.5, 1, NA) via
 load_dataframe_categorical(
   data,
   model,
-  unknown_target_value = "?",
   target_id_col = "target_id",
   target_value_col = "target_value",
   specimen_id_col = "specimen_id",
@@ -31,8 +30,7 @@ load_dataframe_categorical(
 
   Model type (must be `"categorical"`).
 
-- unknown_target_value, target_id_col, target_value_col,
-  specimen_id_col, target_count_col:
+- target_id_col, target_value_col, specimen_id_col, target_count_col:
 
   Same as
   [`load_dataframe`](https://plasmogenepi.github.io/snp.slicer/reference/load_dataframe.md).

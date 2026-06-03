@@ -13,6 +13,7 @@ strain haplotypes and links them to hosts from SNP data.
 ## Installation
 
 ``` r
+
 # Install from our r-universe
 install.packages(
     'snp.slicer', 
