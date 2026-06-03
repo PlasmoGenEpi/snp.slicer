@@ -263,13 +263,15 @@ slice_update_mu <- function(state, model_obj) {
   }
   
   # Update mu[2:kplus-1] (middle sticks)
-  for (k in 2:(state$kplus - 1)) {
-    if (k + 1 <= length(state$mu) && k - 1 >= 1 && 
-        !is.na(state$mu[k + 1]) && !is.na(state$mu[k - 1]) && 
-        is.finite(state$mu[k + 1]) && is.finite(state$mu[k - 1])) {
-      state$mu[k] <- gridsample(state$mu[k + 1], state$mu[k - 1], function(x) logf_oldfeature(x, m[k], model_obj$N))
-    } else {
-      state$mu[k] <- 0.5  # Default value
+  if (state$kplus > 2L) {
+    for (k in 2:(state$kplus - 1)) {
+      if (k + 1 <= length(state$mu) && k - 1 >= 1 && 
+          !is.na(state$mu[k + 1]) && !is.na(state$mu[k - 1]) && 
+          is.finite(state$mu[k + 1]) && is.finite(state$mu[k - 1])) {
+        state$mu[k] <- gridsample(state$mu[k + 1], state$mu[k - 1], function(x) logf_oldfeature(x, m[k], model_obj$N))
+      } else {
+        state$mu[k] <- 0.5  # Default value
+      }
     }
   }
   
