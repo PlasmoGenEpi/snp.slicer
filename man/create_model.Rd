@@ -4,7 +4,13 @@
 \alias{create_model}
 \title{Create model object}
 \usage{
-create_model(model, processed_data, alpha = 2.6, rho = 0.5, ...)
+create_model(
+  model,
+  processed_data,
+  alpha = 2.6,
+  rho = ifelse(model == "categorical", 0.5, NULL),
+  ...
+)
 }
 \arguments{
 \item{model}{Model type}

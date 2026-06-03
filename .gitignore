@@ -46,3 +46,6 @@ Desktop.ini
 # Linter configuration
 .lintr
 docs
+
+# Claude
+CLAUDE.md

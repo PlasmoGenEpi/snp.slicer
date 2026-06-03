@@ -6,10 +6,20 @@
 #'
 #' @return Model object with initialization and likelihood functions
 #' @keywords internal
-create_model <- function(model, processed_data, alpha = 2.6, rho = 0.5, ...) {
+create_model <- function(
+                         model, 
+                         processed_data, 
+                         alpha = 2.6, 
+                         rho = ifelse(model == "categorical", 0.5, NULL), 
+                         ...) {
   
   # Extract additional parameters
   params <- list(...)
+  if (is.null(rho)) {
+    polymorphic_obs <- !is.na(processed_data$y) & processed_data$y != processed_data$r
+    rho <- sum(processed_data$y[polymorphic_obs], na.rm = TRUE) /
+      sum(processed_data$r[polymorphic_obs], na.rm = TRUE)
+  }
   
   # Create model-specific object
   if (model == "categorical") {

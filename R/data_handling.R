@@ -30,28 +30,33 @@ validate_input_data <- function(data, model, ...) {
   }
 
   if (is.data.frame(data)) {
-    if (model == "categorical") {
-      params <- list(
-        target_id_col = "target_id",
-        target_value_col = "target_value",
-        specimen_id_col = "specimen_id",
-        target_count_col = "target_count"
-      )
-      overrides <- list(...)
-      for (nm in names(overrides)) if (nm %in% names(params)) params[[nm]] <- overrides[[nm]]
-      required <- c(params$target_id_col, params$target_value_col, params$specimen_id_col, params$target_count_col)
-      missing <- setdiff(required, names(data))
-      if (length(missing) > 0) {
-        stop("Categorical data.frame must have columns: ", paste(required, collapse = ", "), "; missing: ", paste(missing, collapse = ", "))
-      }
-      if (nrow(data) == 0) {
-        stop("Categorical data.frame cannot be empty")
-      }
-      count_col <- params$target_count_col
-      if (is.numeric(data[[count_col]]) && any(data[[count_col]] < 0, na.rm = TRUE)) {
-        stop("target_count cannot be negative")
-      }
+    params <- list(
+      target_id_col = "target_id",
+      target_value_col = "target_value",
+      specimen_id_col = "specimen_id",
+      target_count_col = "target_count"
+    )
+    overrides <- list(...)
+    for (nm in names(overrides)) if (nm %in% names(params)) params[[nm]] <- overrides[[nm]]
+
+    # All long-format data.frames (categorical and count) need the same four columns.
+    # Categorical uses target_count too: counts_to_categorical derives 0/0.5/1/NA from
+    # whether each allele's summed count is > 0.
+    required <- c(params$target_id_col, params$target_value_col, params$specimen_id_col, params$target_count_col)
+    missing <- setdiff(required, names(data))
+    if (length(missing) > 0) {
+      stop("Long-format data.frame must have columns: ", paste(required, collapse = ", "), "; missing: ", paste(missing, collapse = ", "))
     }
+    if (nrow(data) == 0) {
+      stop("Long-format data.frame cannot be empty")
+    }
+    count_col <- params$target_count_col
+    if (is.numeric(data[[count_col]]) && any(data[[count_col]] < 0, na.rm = TRUE)) {
+      stop("target_count cannot be negative")
+    }
+
+    # Structural checks shared by all long-format data.frames (categorical or count)
+    validate_long_dataframe(data, params)
     return(TRUE)
   }
 
@@ -112,6 +117,51 @@ validate_input_data <- function(data, model, ...) {
   stop("Unsupported data type. Expected matrix, data.frame, list, or file path")
 }
 
+#' Structural validation for long-format data.frames
+#'
+#' Checks shared by every long-format input (categorical and count models): each
+#' allele must appear at most once per specimen and target, and at least one
+#' target must be biallelic (exactly two observed alleles) so the model has
+#' variation to resolve strains. Monomorphic targets are allowed alongside
+#' biallelic ones; targets with more than two alleles are dropped downstream by
+#' \code{\link{load_dataframe}}. The caller (\code{\link{validate_input_data}})
+#' guarantees the key columns are present before this is called.
+#'
+#' @param data Long-format data.frame.
+#' @param params List of resolved column names with elements
+#'   \code{specimen_id_col}, \code{target_id_col}, \code{target_value_col}.
+#' @return Invisibly \code{TRUE}; otherwise throws an error.
+#' @keywords internal
+validate_long_dataframe <- function(data, params) {
+  sid <- params$specimen_id_col
+  tid <- params$target_id_col
+  tval <- params$target_value_col
+  tcol <- params$target_count_col
+
+  # No duplicate allele rows: each (specimen, target, value) at most once.
+  if (anyDuplicated(data[, c(sid, tid, tval), drop = FALSE]) > 0) {
+    stop("Input data contains duplicate (", sid, ", ", tid, ", ", tval,
+         ") rows; each allele must appear at most once per specimen and target")
+  }
+
+  # At least one biallelic locus (exactly two observed alleles) must survive the
+  # downstream <=2-allele filter, or there is no variation to model.
+  alleles_per_target <- tapply(data[[tval]], data[[tid]], function(v) length(unique(v)))
+  if (length(alleles_per_target) == 0 || !any(alleles_per_target == 2)) {
+    stop("Input data has no biallelic loci (targets with exactly two observed alleles)")
+  }
+
+  # At least one biallelic locus must have positive total reads
+  biallelic_targets <- names(alleles_per_target)[alleles_per_target == 2]
+  biallelic_rows <- data[[tid]] %in% biallelic_targets
+  total_by_biallelic <- tapply(data[[tcol]][biallelic_rows], data[[tid]][biallelic_rows], sum, na.rm = TRUE)
+  if (!any(total_by_biallelic > 0)) {
+    stop("All biallelic loci have zero or missing total reads")
+  }
+
+  invisible(TRUE)
+}
+
 #' Validate algorithm parameters
 #'
 #' @param alpha IBP concentration parameter
@@ -126,7 +176,7 @@ validate_parameters <- function(alpha, rho, threshold) {
     stop("alpha must be a positive number")
   }
   
-  if (!is.numeric(rho) || rho < 0 || rho > 1) {
+  if (!is.null(rho) && (!is.numeric(rho) || rho < 0 || rho > 1)) {
     stop("rho must be a number between 0 and 1")
   }
   
@@ -199,14 +249,13 @@ counts_to_categorical <- function(read0, read1) {
 #' \describe{
 #'   \item{specimen_id}{Specimen ID}
 #'   \item{target_id}{Target ID}
-#'   \item{target_value}{Target value}
-#'   \item{target_count}{Target count (optional)}
+#'   \item{target_value}{Target value (allele)}
+#'   \item{target_count}{Target count}
 #' }
-#' For each target, there are at exactly 2 target values observed. If there is only one,
-#' the second value is set to unknown_target_value. Target count is required if model is
-#' not "categorical".
+#'   Input is assumed to have passed \code{\link{validate_input_data}}: the four
+#'   columns are present, no \code{(specimen, target, value)} row is duplicated, and
+#'   at least one target is biallelic.
 #' @param model Model type
-#' @param unknown_target_value Value to use for unknown targets
 #' @param target_id_col Name of the target ID column
 #' @param target_value_col Name of the target value column
 #' @param specimen_id_col Name of the specimen ID column
@@ -214,84 +263,90 @@ counts_to_categorical <- function(read0, read1) {
 #'
 #' @return Processed data list with y, r, and metadata
 #'
-#' @details When \code{model == "categorical"}, long-format data.frames are handled by
+#' @details The alleles for each target are sorted and given indices such that 
+#'   target_idx 1 (read0) is the minor allele and target_idx 2 (read1) 
+#'   the major. For monomorphic targets, with only one observed allele, both 
+#'   slots carry that same label and read1 is zero (because no second allele 
+#'   was observed). A specimen with no reads at a target (i.e., total_count 0) 
+#'   is encoded as \code{NA} for both slots, thus distinguishing a missing 
+#'   genotype from a homozygous call.
+#'
+#'   When \code{model == "categorical"}, long-format data.frames are handled by
 #'   \code{load_dataframe_categorical}, which builds read0/read1 matrices from the same
-#'   column layout and then converts counts to categorical observations: ref-only -> 0,
-#'   alt-only -> 1, both present -> 0.5, zero total -> NA.
+#'   layout and then converts counts to categorical observations.  For categorical
+#'   data the allele order is determined by descending \code{target_value} (not by
+#'   count), so the lexicographically larger allele label occupies target_idx 1
+#'   (read0).  A specimen observed with only that allele yields \code{y = 0}, with
+#'   only the other allele \code{y = 1}, with both \code{y = 0.5}, and with no reads
+#'   \code{y = NA}.
 #'
 #' @keywords internal
 load_dataframe <- function(
-  data, model, unknown_target_value = "?", target_id_col = "target_id", target_value_col = "target_value", specimen_id_col = "specimen_id", target_count_col = "target_count") {
-  # Data needs to be completed so that every target has 2 values observed and every specimen has 
-  # a value for every target. If only one target value is observed for a specimen, the second value
-  # is set to 0. If neither target value is observed for a specimen, both values are set to NA.
- data_renamed <- data |>
+  data, model, target_id_col = "target_id", target_value_col = "target_value", specimen_id_col = "specimen_id", target_count_col = "target_count") {
+  data_renamed <- data |>
     dplyr::rename(
-      target_id = !!target_id_col, 
-      target_value = !!target_value_col, 
-      specimen_id = !!specimen_id_col, 
+      target_id = !!target_id_col,
+      target_value = !!target_value_col,
+      specimen_id = !!specimen_id_col,
       target_count = !!target_count_col
     ) |>
     dplyr::select(target_id, target_value, specimen_id, target_count)
-  
-  complete_targets <- data_renamed |>
-    dplyr::select(target_id, target_value) |>
-    dplyr::distinct() |>
+
+  # Order alleles per target, remove loci with more than two alleles, 
+  # and assign target indices
+  target_alleles <- data_renamed |>
+    dplyr::group_by(target_id, target_value) |>
+    dplyr::summarize(total_count = sum(target_count), .groups = "drop") |>
     dplyr::group_by(target_id) |>
-    dplyr::summarize(target_value = list(target_value)) |>
-    # remove targets with more than 2 variants
-    dplyr::filter(sapply(target_value, length) <= 2) |>
-    dplyr::mutate(
-      target_value = ifelse(
-        sapply(target_value, length) == 1, 
-        sapply(target_value, function(x) c(x, unknown_target_value)),
-        target_value
-      ),
+    dplyr::filter(dplyr::n() <= 2) |>
+    dplyr::arrange(
+      # SNP-Slice assumes the minor allele is in the first slot
+      if (model != "categorical") total_count else 0, 
+      dplyr::desc(target_value), 
+      .by_group = TRUE
     ) |>
-    tidyr::unnest(target_value)
-  
-  
-  completed_data <- data_renamed |>
-    dplyr::right_join(complete_targets) |>
-    tidyr::complete(
-      specimen_id, tidyr::nesting(target_id, target_value), 
-      fill = list(target_count = 0)
-    ) |>
-    dplyr::filter(!is.na(specimen_id)) |>
+    dplyr::mutate(target_idx = dplyr::row_number()) |>
+    dplyr::select(-total_count) |>
+    dplyr::ungroup()
+
+  # Pivot
+  target_alleles_wide <- target_alleles |>
+    tidyr::pivot_wider(names_from = target_idx, values_from = target_value, names_prefix = "a")
+  # Monomorphic targets have no target_idx 2, so duplicate the target_idx 1 label into a2
+  target_alleles_wide$a2 <- dplyr::coalesce(target_alleles_wide$a2, target_alleles_wide$a1)
+
+  # Observed counts per (specimen, target, target_idx)
+  counts_by_idx <- data_renamed |>
+    # inner_join maps each observation to exactly one target_idx and drops >2-allele loci.
+    dplyr::inner_join(target_alleles, by = c("target_id", "target_value")) |>
+    dplyr::select(specimen_id, target_id, target_idx, target_count)
+
+  # Complete the specimen x target x target_idx grid.
+  completed_data <- counts_by_idx |>
+    # Fill in second target_idx of monomorphic loci with count of 0
+    tidyr::complete(specimen_id, target_id, target_idx = 1:2, fill = list(target_count = 0)) |>
     dplyr::group_by(specimen_id, target_id) |>
+    # Set count to NA for missing loci
     dplyr::mutate(total_count = sum(target_count)) |>
     dplyr::ungroup() |>
     dplyr::mutate(target_count = ifelse(total_count == 0, NA, target_count)) |>
     dplyr::select(-total_count) |>
-    dplyr::group_by(specimen_id, target_id) |>
-    dplyr::arrange(dplyr::desc(target_value)) |>
-    dplyr::mutate(target_idx = seq(2)) |>
-    dplyr::ungroup() |>
     dplyr::arrange(specimen_id, target_id)
 
-  read0_df <- completed_data |>
-    dplyr::filter(target_idx == 1) |>
-    dplyr::arrange(specimen_id, target_id)
+  read0_df <- completed_data |> dplyr::filter(target_idx == 1)
+  read1_df <- completed_data |> dplyr::filter(target_idx == 2)
 
-  read1_df <- completed_data |>
-    dplyr::filter(target_idx == 2) |>
-    dplyr::arrange(specimen_id, target_id)
-  
-  specimen_ids <- read0_df$specimen_id |> unique()
-  target_ids <- read0_df$target_id |> unique()
-
+  specimen_ids <- unique(read0_df$specimen_id)
+  target_ids <- unique(read0_df$target_id)
   nspecs <- length(specimen_ids)
   ntars <- length(target_ids)
 
   read0_mat <- matrix(read0_df$target_count, nrow = nspecs, ncol = ntars, dimnames = list(specimen_ids, target_ids), byrow = TRUE)
   read1_mat <- matrix(read1_df$target_count, nrow = nspecs, ncol = ntars, dimnames = list(specimen_ids, target_ids), byrow = TRUE)
 
-  # get the target_values in order of the columns of read0_mat
-  r0_values_ordered <- read0_df$target_value[match(colnames(read0_mat), read0_df$target_id)]
-
-  # get the target_values in order of the columns of read1_mat
-  r1_values_ordered <- read1_df$target_value[match(colnames(read1_mat), read1_df$target_id)]
-
+  # Per-column allele labels (target_idx 2 == target_idx 1 for monomorphic loci).
+  r0_values_ordered <- target_alleles_wide$a1[match(target_ids, target_alleles_wide$target_id)]
+  r1_values_ordered <- target_alleles_wide$a2[match(target_ids, target_alleles_wide$target_id)]
 
   return(list(
     y = read0_mat,
@@ -316,18 +371,17 @@ load_dataframe <- function(
 #'
 #' @param data Input dataframe (same column semantics as \code{load_dataframe}).
 #' @param model Model type (must be \code{"categorical"}).
-#' @param unknown_target_value,target_id_col,target_value_col,specimen_id_col,target_count_col
+#' @param target_id_col,target_value_col,specimen_id_col,target_count_col
 #'   Same as \code{\link{load_dataframe}}.
 #' @return Processed data list with \code{data_type = "categorical"}, \code{y} the categorical
 #'   matrix, and \code{r = NULL}.
 #' @keywords internal
 load_dataframe_categorical <- function(
-  data, model, unknown_target_value = "?", target_id_col = "target_id",
+  data, model, target_id_col = "target_id",
   target_value_col = "target_value", specimen_id_col = "specimen_id",
   target_count_col = "target_count", ...) {
   raw <- load_dataframe(
     data, model,
-    unknown_target_value = unknown_target_value,
     target_id_col = target_id_col,
     target_value_col = target_value_col,
     specimen_id_col = specimen_id_col,
@@ -817,10 +871,11 @@ calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_valu
   # Get the SNP values for each strain at the specified indices
   strain_snps <- D[, snp_indices, drop = FALSE]
   
-  # Generate all possible allele combinations
+  # Generate all possible allele combinations. Monomorphic loci have r0 == r1, so the
+  # cartesian product yields duplicate strings; collapse them so each allele appears once.
   all_combinations <- expand.grid(rs)
-  allele_strings <- apply(all_combinations, 1, paste, collapse = sep)
-  
+  allele_strings <- unique(apply(all_combinations, 1, paste, collapse = sep))
+
   # Initialize count vector
   allele_counts <- rep(0, length(allele_strings))
   names(allele_counts) <- allele_strings
@@ -839,8 +894,8 @@ calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_valu
           Map(\(snp, variants) variants[snp + 1], strain_allele, rs), 
           collapse = sep
         )
-        strain_allele_idx <- which(allele_strings == strain_allele_string)
-        
+        strain_allele_idx <- match(strain_allele_string, allele_strings)
+
         # Add the count for this strain to the allele count
         allele_counts[strain_allele_idx] <- allele_counts[strain_allele_idx] + A[i, strain_idx]
       }
