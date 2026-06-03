@@ -22,6 +22,45 @@ make_count_fixture_with_na <- function() {
 expect_kernel_matches_r <- function(model_obj, seed = 42L, n_iter = 5L) {
   state_r <- run_kernel_iterations(model_obj, mcmc_kernel_r(), seed = seed, n_iter = n_iter)
   state_cpp <- run_kernel_iterations(model_obj, mcmc_kernel_cpp_ad(), seed = seed, n_iter = n_iter)
+  expect_kernel_states_equal(state_cpp, state_r)
+  invisible(list(r = state_r, cpp = state_cpp))
+}
+
+expect_kernel_sm_valid <- function(model_obj, seed = 42L, n_iter = 5L) {
+  state <- run_kernel_iterations(model_obj, mcmc_kernel_cpp_sm(), seed = seed, n_iter = n_iter)
+  expect_true(all(is.finite(state$mu)))
+  expect_true(state$kplus >= 1L && state$kplus <= state$ktrunc)
+  expect_equal(length(state$mu), state$ktrunc)
+  expect_true(all(state$mu > 0 & state$mu <= 1))
+
+  model_obj <- ensure_kernel_obs_cache(model_obj)
+  obs <- kernel_obs_args(model_obj)
+  ll_r <- model_obj$loglikelihood_matrix(state$A, state$D, model_obj)
+  ll_cpp <- cpp_loglik_total(
+    A = state$A,
+    D = state$D,
+    y = model_obj$y,
+    r = model_obj$r,
+    model_type = model_type_id(model_obj$name),
+    llik_tab = kernel_llik_tab(model_obj),
+    loglik_const = obs$loglik_const,
+    obs_code = obs$obs_code
+  )
+  expect_equal(as.numeric(ll_cpp), as.numeric(ll_r), tolerance = 1e-8)
+  invisible(state)
+}
+
+expect_kernel_cpp_reproducible <- function(model_obj, kernel, seed = 42L, n_iter = 5L) {
+  state1 <- run_kernel_iterations(model_obj, kernel, seed = seed, n_iter = n_iter)
+  state2 <- run_kernel_iterations(model_obj, kernel, seed = seed, n_iter = n_iter)
+  expect_equal(state1$A, state2$A)
+  expect_equal(state1$D, state2$D)
+  expect_equal(state1$mu, state2$mu)
+  expect_equal(state1$kstar, state2$kstar)
+  invisible(list(first = state1, second = state2))
+}
+
+expect_kernel_states_equal <- function(state_cpp, state_r) {
   expect_equal(state_cpp$A, state_r$A)
   expect_equal(state_cpp$D, state_r$D)
   expect_equal(state_cpp$mu, state_r$mu)
@@ -30,7 +69,6 @@ expect_kernel_matches_r <- function(model_obj, seed = 42L, n_iter = 5L) {
   expect_equal(state_cpp$ktrunc, state_r$ktrunc)
   expect_equal(as.numeric(state_cpp$loglik), as.numeric(state_r$loglik), tolerance = 1e-6)
   expect_equal(as.numeric(state_cpp$logpost), as.numeric(state_r$logpost), tolerance = 1e-6)
-  invisible(list(r = state_r, cpp = state_cpp))
 }
 
 run_kernel_iterations <- function(model_obj, kernel, seed, n_iter = 5L) {
@@ -55,35 +93,28 @@ mcmc_kernel_cpp_ad <- function() {
   )
 }
 
-test_that("fused cpp_slice_iter matches sequential cpp kernel updates", {
+#' Kernel that uses compiled s/mu updates with R reference A/D (for equivalence tests)
+mcmc_kernel_cpp_sm <- function() {
+  list(
+    name = "cpp",
+    update_s = kernel_update_s_cpp,
+    update_mu = kernel_update_mu_cpp,
+    update_a = slice_update_a_r,
+    update_d = slice_update_d_r
+  )
+}
+
+test_that("fused and sequential cpp kernels are each reproducible", {
   skip_if_not(cpp_kernel_available())
 
   processed <- preprocess_data(make_count_fixture(), "negative_binomial")
   model_obj <- create_model("negative_binomial", processed)
 
-  run_iters <- function(kernel, seed = 42L) {
-    set.seed(seed)
-    state <- model_obj$initialize_state(model_obj, threshold = 0.001)
-    state <- slice_init(state, model_obj)
-    model_obj$kernel <- kernel
-    for (iter in seq_len(5L)) {
-      state <- slice_iter(state, model_obj)
-    }
-    state
-  }
+  expect_kernel_cpp_reproducible(model_obj, mcmc_kernel_cpp())
 
   kernel_seq <- mcmc_kernel_cpp()
   kernel_seq$update_iter <- NULL
-
-  state_fused <- run_iters(mcmc_kernel_cpp())
-  state_seq <- run_iters(kernel_seq)
-
-  expect_equal(state_fused$A, state_seq$A)
-  expect_equal(state_fused$D, state_seq$D)
-  expect_equal(state_fused$mu, state_seq$mu)
-  expect_equal(state_fused$kstar, state_seq$kstar)
-  expect_equal(state_fused$kplus, state_seq$kplus)
-  expect_equal(state_fused$ktrunc, state_seq$ktrunc)
+  expect_kernel_cpp_reproducible(model_obj, kernel_seq)
 })
 
 test_that("compiled A/D kernel matches R reference on count models", {
@@ -92,6 +123,34 @@ test_that("compiled A/D kernel matches R reference on count models", {
   processed <- preprocess_data(make_count_fixture(), "negative_binomial")
   model_obj <- create_model("negative_binomial", processed)
   expect_kernel_matches_r(model_obj)
+})
+
+test_that("compiled s/mu kernel produces valid state on count models", {
+  skip_if_not(cpp_kernel_available())
+
+  processed <- preprocess_data(make_count_fixture(), "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed)
+  expect_kernel_sm_valid(model_obj)
+})
+
+test_that("compiled s/mu kernel produces valid state on poisson and binomial count models", {
+  skip_if_not(cpp_kernel_available())
+
+  for (model_name in c("poisson", "binomial")) {
+    processed <- preprocess_data(make_count_fixture(), model_name)
+    model_obj <- create_model(model_name, processed)
+    expect_kernel_sm_valid(model_obj)
+  }
+})
+
+test_that("full compiled kernel is reproducible and self-consistent", {
+  skip_if_not(cpp_kernel_available())
+
+  processed <- preprocess_data(make_count_fixture(), "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed)
+  kernel_seq <- mcmc_kernel_cpp()
+  kernel_seq$update_iter <- NULL
+  expect_kernel_cpp_reproducible(model_obj, kernel_seq)
 })
 
 test_that("compiled kernel matches R when some genotypes are missing", {
