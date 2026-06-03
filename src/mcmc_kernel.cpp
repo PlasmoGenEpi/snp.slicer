@@ -561,6 +561,7 @@ Rcpp::List cpp_slice_iter(Rcpp::NumericMatrix A,
                           Rcpp::NumericMatrix llik_tab,
                           Rcpp::Nullable<Rcpp::NumericVector> loglik_const = R_NilValue,
                           Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
+  Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
   state.A = A;
   state.D = D;

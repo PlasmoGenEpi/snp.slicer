@@ -168,21 +168,25 @@ inline double loglik_categorical_value(double y, double prop,
 
 inline double sample_grid_logweights(const std::vector<double>& lw,
                                      const std::vector<double>& xgrid) {
+  const int n = static_cast<int>(lw.size());
+  if (n == 0) return 0.5;
   double maxlw = R_NegInf;
   for (double w : lw) {
     if (w > maxlw) maxlw = w;
   }
   double sum = 0.0;
-  for (double w : lw) {
-    sum += std::exp(w - maxlw);
+  std::vector<double> probs(static_cast<std::size_t>(n));
+  for (int i = 0; i < n; ++i) {
+    probs[static_cast<std::size_t>(i)] = std::exp(lw[static_cast<std::size_t>(i)] - maxlw);
+    sum += probs[static_cast<std::size_t>(i)];
   }
-  const double u = unif_rand();
+  const double u = unif_rand() * sum;
   double cum = 0.0;
-  for (std::size_t i = 0; i < lw.size(); ++i) {
-    cum += std::exp(lw[i] - maxlw) / sum;
-    if (u < cum) return xgrid[i];
+  for (int i = 0; i < n; ++i) {
+    cum += probs[static_cast<std::size_t>(i)];
+    if (u <= cum) return xgrid[static_cast<std::size_t>(i)];
   }
-  return xgrid.back();
+  return xgrid[static_cast<std::size_t>(n - 1)];
 }
 
 inline double gridsample_bounds(double lb, double ub,

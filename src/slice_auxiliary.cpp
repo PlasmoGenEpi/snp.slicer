@@ -4,13 +4,20 @@
 #include <algorithm>
 #include <vector>
 
-using snp_slicer::gridsample_bounds;
-using snp_slicer::logf_newfeature;
-using snp_slicer::logf_oldfeature;
-
 namespace snp_slicer {
 namespace kernel {
-namespace {
+
+double gridsample_newfeature(double lb, double ub, int N, double alpha) {
+  return snp_slicer::gridsample_bounds(lb, ub, [N, alpha](double x) {
+    return snp_slicer::logf_newfeature(x, N, alpha);
+  });
+}
+
+double gridsample_oldfeature(double lb, double ub, int m, int N) {
+  return snp_slicer::gridsample_bounds(lb, ub, [m, N](double x) {
+    return snp_slicer::logf_oldfeature(x, m, N);
+  });
+}
 
 int get_kstar(const Rcpp::NumericMatrix& A) {
   int result = 0;
@@ -29,6 +36,8 @@ double get_mustar(const Rcpp::NumericMatrix& A, const Rcpp::NumericVector& mu) {
   if (kstar == 0) return 0.0;
   return mu[kstar - 1];
 }
+
+namespace {
 
 void refresh_feature(Rcpp::NumericMatrix& A,
                      Rcpp::NumericMatrix& D,
@@ -72,9 +81,9 @@ void update_s(SliceState& state, const ModelData& model) {
   const double mustar = get_mustar(A, mu);
   const double s = mustar * unif_rand();
 
+  int k = ktrunc;
   // Match R slice_update_s_r: loop while s < mu[k]; when k exceeds length(mu), stop
   // (do not also require k <= mu.size() — k and length grow together and never exit).
-  int k = ktrunc;
   const int max_stick_steps = 10000;
   int stick_steps = 0;
   while (true) {
@@ -85,11 +94,7 @@ void update_s(SliceState& state, const ModelData& model) {
                     max_stick_steps);
       break;
     }
-    const double munext = gridsample_bounds(
-      0.0,
-      mu[k - 1],
-      [&](double x) { return logf_newfeature(x, N, alpha); }
-    );
+    const double munext = gridsample_newfeature(0.0, mu[k - 1], N, alpha);
     mu.push_back(munext);
     k++;
   }
@@ -140,23 +145,19 @@ void update_mu(SliceState& state, const ModelData& model) {
   const double alpha = model.alpha;
   const Rcpp::NumericVector m = column_sums(state.A);
 
-  if (kplus > 1 && mu.size() >= 2 && R_finite(mu[1])) {
-    mu[0] = gridsample_bounds(
-      mu[1],
-      1.0,
-      [&](double x) { return logf_oldfeature(x, static_cast<int>(m[0]), N); }
-    );
+  if (kplus > 1) {
+    if (mu.size() >= 2 && R_finite(mu[1])) {
+      mu[0] = gridsample_oldfeature(mu[1], 1.0, static_cast<int>(m[0]), N);
+    } else {
+      mu[0] = 0.5;
+    }
   }
 
   for (int k = 2; k <= kplus - 1; ++k) {
     const int idx = k - 1;
     if (k + 1 <= static_cast<int>(mu.size()) && k - 1 >= 1 &&
         R_finite(mu[k]) && R_finite(mu[k - 2])) {
-      mu[idx] = gridsample_bounds(
-        mu[k],
-        mu[k - 2],
-        [&](double x) { return logf_oldfeature(x, static_cast<int>(m[idx]), N); }
-      );
+      mu[idx] = gridsample_oldfeature(mu[k], mu[k - 2], static_cast<int>(m[idx]), N);
     } else {
       mu[idx] = 0.5;
     }
@@ -166,11 +167,7 @@ void update_mu(SliceState& state, const ModelData& model) {
     const int idx = k - 1;
     if (idx < 0 || idx >= static_cast<int>(mu.size())) continue;
     if (k - 1 >= 1 && R_finite(mu[k - 2])) {
-      mu[idx] = gridsample_bounds(
-        0.0,
-        mu[k - 2],
-        [&](double x) { return logf_newfeature(x, N, alpha); }
-      );
+      mu[idx] = gridsample_newfeature(0.0, mu[k - 2], N, alpha);
     } else {
       mu[idx] = 0.5;
     }
@@ -188,6 +185,7 @@ Rcpp::List cpp_update_s(Rcpp::NumericMatrix A,
                         double alpha,
                         double rho,
                         int P) {
+  Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
   state.A = A;
   state.D = D;
@@ -218,6 +216,7 @@ Rcpp::NumericVector cpp_update_mu(Rcpp::NumericMatrix A,
                                   int ktrunc,
                                   int N,
                                   double alpha) {
+  Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
   state.A = A;
   state.mu = mu;

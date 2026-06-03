@@ -136,6 +136,24 @@ kernel_with_obs_cache <- function(kernel, model_obj) {
   kernel
 }
 
+#' Preserve dimnames when compiled code returns a fresh matrix
+#' @keywords internal
+restore_matrix_dimnames <- function(updated, template) {
+  dn <- dimnames(template)
+  if (is.null(dn)) {
+    return(updated)
+  }
+  out <- dn
+  if (!is.null(dn[[1]]) && length(dn[[1]]) != nrow(updated)) {
+    out[[1]] <- NULL
+  }
+  if (!is.null(dn[[2]]) && length(dn[[2]]) != ncol(updated)) {
+    out[[2]] <- NULL
+  }
+  dimnames(updated) <- out
+  updated
+}
+
 #' Resolve kernel adapter and attach cpp obs cache on \code{model_obj}
 #'
 #' Call before a manual \code{slice_iter()} loop when not using \code{run_mcmc()}.
@@ -232,7 +250,7 @@ kernel_update_iter_cpp <- function(state, model_obj) {
     obs_code = obs$obs_code
   )
   state$A <- result$A
-  state$D <- result$D
+  state$D <- restore_matrix_dimnames(result$D, state$D)
   state$mu <- result$mu
   state$kplus <- result$kplus
   state$kstar <- result$kstar
@@ -252,7 +270,7 @@ kernel_update_s_cpp <- function(state, model_obj) {
     P = as.integer(model_obj$P)
   )
   state$A <- result$A
-  state$D <- result$D
+  state$D <- restore_matrix_dimnames(result$D, state$D)
   state$mu <- result$mu
   state$ktrunc <- result$ktrunc
   state$kplus <- result$kplus
