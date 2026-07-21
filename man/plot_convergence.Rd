@@ -4,12 +4,16 @@
 \alias{plot_convergence}
 \title{Plot convergence diagnostics}
 \usage{
-plot_convergence(results, type = "logpost")
+plot_convergence(results, type = "logpost", additional_burnin = 0)
 }
 \arguments{
 \item{results}{SNP-Slice results object}
 
 \item{type}{Type of plot ("logpost", "kstar", "n_strains")}
+
+\item{additional_burnin}{Number of additional stored samples to discard from
+the start of the retained chain. The retained chain is already
+post-burn-in, so this defaults to 0.}
 }
 \value{
 Plot object (if ggplot2 is available)

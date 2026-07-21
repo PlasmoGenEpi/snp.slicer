@@ -14,16 +14,21 @@
 #'   inputs (e.g. \code{*_cat.txt}) remain supported.
 #' @param model Observation model to use. Options: "categorical", "poisson", "binomial",
 #'   "negative_binomial" (default).
-#' @param n_mcmc Number of MCMC iterations (default: 10000).
-#' @param burnin Burn-in period. If NULL, defaults to n_mcmc/2.
+#' @param n_sample Number of post-burn-in iterations to retain (default: 10000).
+#'   Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
+#'   iterations in total and only the last \code{n_sample} are retained.
+#' @param n_burnin Number of iterations discarded before sampling begins. If
+#'   NULL, defaults to \code{floor(n_sample / 2)}.
 #' @param alpha IBP concentration parameter (default: 2.6).
 #' @param rho Dictionary sparsity parameter (default: 0.5 for categorical model and NULL otherwise, which means use the global minor allele frequency)
 #' @param threshold Threshold for identifying single infections (default: 0.001).
-#' @param gap Early stopping threshold. If NULL, runs for full n_mcmc iterations.
+#' @param gap Early stopping threshold. If NULL, runs for all
+#'   \code{n_burnin + n_sample} iterations.
 #' @param seed Random seed for reproducibility.
 #' @param verbose Whether to print progress information (default: TRUE).
 #' @param log_performance Whether to log performance metrics (default: FALSE).
 #' @param store_mcmc Whether to store full MCMC samples (default: FALSE).
+#'   Only post-burn-in iterations are stored.
 #' @param ... Additional model-specific parameters.
 #'
 #' @return An object of class `snp_slice_results` containing:
@@ -45,7 +50,7 @@
 #'   read0 = matrix(c(90, 95, 85, 92), nrow = 2)
 #' )
 #'
-#' result <- snp_slice(data, model = "negative_binomial", n_mcmc = 1000)
+#' result <- snp_slice(data, model = "negative_binomial", n_sample = 1000)
 #'
 #' # Extract results
 #' strains <- extract_strains(result)
@@ -55,8 +60,8 @@
 #' @export
 snp_slice <- function(data,
                       model = "negative_binomial",
-                      n_mcmc = 10000,
-                      burnin = NULL,
+                      n_sample = 10000,
+                      n_burnin = NULL,
                       alpha = 2.6,
                       rho = if (model == "categorical") 0.5 else NULL,
                       threshold = 0.001,
@@ -66,6 +71,7 @@ snp_slice <- function(data,
                       log_performance = FALSE,
                       store_mcmc = FALSE,
                       ...) {
+
   # Set random seed if provided
   if (!is.null(seed)) {
     set.seed(seed)
@@ -73,11 +79,11 @@ snp_slice <- function(data,
 
   # Validate inputs
   validate_parameters(alpha, rho, threshold)
-  validate_mcmc_settings(n_mcmc, burnin, gap)
+  validate_mcmc_settings(n_sample, n_burnin, gap)
 
-  # Set default burnin if not provided
-  if (is.null(burnin)) {
-    burnin <- floor(n_mcmc / 2)
+  # Set default burn-in if not provided
+  if (is.null(n_burnin)) {
+    n_burnin <- floor(n_sample / 2)
   }
 
   # Validate input data before preprocessing
@@ -93,13 +99,13 @@ snp_slice <- function(data,
   if (verbose) {
     cat("Running SNP-Slice with", model, "model\n")
     cat("N =", nrow(processed_data$y), "hosts, P =", ncol(processed_data$y), "SNPs\n")
-    cat("MCMC iterations:", n_mcmc, "burnin:", burnin, "\n")
+    cat("Retained samples:", n_sample, "burn-in:", n_burnin, "\n")
   }
 
   result <- run_mcmc(
     model_obj = model_obj,
-    n_mcmc = n_mcmc,
-    burnin = burnin,
+    n_sample = n_sample,
+    n_burnin = n_burnin,
     gap = gap,
     verbose = verbose,
     store_mcmc = store_mcmc

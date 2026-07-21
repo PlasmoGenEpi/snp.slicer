@@ -4,14 +4,14 @@
 \alias{run_mcmc}
 \title{Run MCMC for SNP-Slice}
 \usage{
-run_mcmc(model_obj, n_mcmc, burnin, gap, verbose, store_mcmc)
+run_mcmc(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc)
 }
 \arguments{
 \item{model_obj}{Model object}
 
-\item{n_mcmc}{Number of MCMC iterations}
+\item{n_sample}{Number of post-burn-in iterations to retain}
 
-\item{burnin}{Burn-in period}
+\item{n_burnin}{Number of iterations discarded before sampling begins}
 
 \item{gap}{Early stopping threshold}
 
@@ -24,5 +24,8 @@ MCMC results
 }
 \description{
 Run MCMC for SNP-Slice
+}
+\details{
+Only sampling iterations are returned when \code{store_mcmc = TRUE}.
 }
 \keyword{internal}

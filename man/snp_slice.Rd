@@ -11,8 +11,8 @@
 snp_slice(
   data,
   model = "negative_binomial",
-  n_mcmc = 10000,
-  burnin = NULL,
+  n_sample = 10000,
+  n_burnin = NULL,
   alpha = 2.6,
   rho = if (model == "categorical") 0.5 else NULL,
   threshold = 0.001,
@@ -44,9 +44,12 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 \item{model}{Observation model to use. Options: "categorical", "poisson", "binomial",
 "negative_binomial" (default).}
 
-\item{n_mcmc}{Number of MCMC iterations (default: 10000).}
+\item{n_sample}{Number of post-burn-in iterations to retain (default: 10000).
+Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
+iterations in total and only the last \code{n_sample} are retained.}
 
-\item{burnin}{Burn-in period. If NULL, defaults to n_mcmc/2.}
+\item{n_burnin}{Number of iterations discarded before sampling begins. If
+NULL, defaults to \code{floor(n_sample / 2)}.}
 
 \item{alpha}{IBP concentration parameter (default: 2.6).}
 
@@ -54,7 +57,8 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 
 \item{threshold}{Threshold for identifying single infections (default: 0.001).}
 
-\item{gap}{Early stopping threshold. If NULL, runs for full n_mcmc iterations.}
+\item{gap}{Early stopping threshold. If NULL, runs for all
+\code{n_burnin + n_sample} iterations.}
 
 \item{seed}{Random seed for reproducibility.}
 
@@ -62,7 +66,8 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 
 \item{log_performance}{Whether to log performance metrics (default: FALSE).}
 
-\item{store_mcmc}{Whether to store full MCMC samples (default: FALSE).}
+\item{store_mcmc}{Whether to store full MCMC samples (default: FALSE).
+Only post-burn-in iterations are stored.}
 
 \item{...}{Additional model-specific parameters.}
 
@@ -94,7 +99,7 @@ data <- list(
   read0 = matrix(c(90, 95, 85, 92), nrow = 2)
 )
 
-result <- snp_slice(data, model = "negative_binomial", n_mcmc = 1000)
+result <- snp_slice(data, model = "negative_binomial", n_sample = 1000)
 
 # Extract results
 strains <- extract_strains(result)

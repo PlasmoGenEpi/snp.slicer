@@ -51,7 +51,7 @@ test_that("Poisson model works with read count data", {
   expect_no_error({
     result <- snp_slice_poisson(
         data,
-        n_mcmc = 25,  # Short run for testing
+        n_sample = 25,  # Short run for testing
         verbose = FALSE,
         store_mcmc = TRUE
     )
@@ -104,7 +104,7 @@ test_that("Negative Binomial model works with read count data", {
       read1 = small_read1,
       read0 = small_read0
     ), 
-                                         n_mcmc = 25,  # Short run for testing
+                                         n_sample = 25,  # Short run for testing
                                          verbose = FALSE,
                                          store_mcmc = TRUE)
   })
@@ -156,7 +156,7 @@ test_that("Binomial model works with read count models", {
       read1 = small_read1,
       read0 = small_read0
     ), 
-                                n_mcmc = 25,  # Short run for testing
+                                n_sample = 25,  # Short run for testing
                                 verbose = FALSE,
                                 store_mcmc = TRUE)
   })
@@ -270,7 +270,7 @@ test_that("read count models converge and produce reasonable results", {
         read1 = small_read1,
         read0 = small_read0
       ), 
-                          n_mcmc = 25,  # Short run for convergence testing
+                          n_sample = 25,  # Short run for convergence testing
                           verbose = FALSE,
                           store_mcmc = TRUE)
     })
@@ -326,7 +326,7 @@ test_that("read count models handle different parameter settings", {
         read1 = small_read1,
         read0 = small_read0
       ), 
-                                 n_mcmc = 25,  # Short run for testing
+                                 n_sample = 25,  # Short run for testing
                                  alpha = params$alpha,
                                  rho = params$rho,
                                  verbose = FALSE)

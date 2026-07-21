@@ -7,7 +7,8 @@
 effective_sample_size(
   results,
   parameter = "logpost",
-  method = "autocorrelation"
+  method = "autocorrelation",
+  additional_burnin = 0
 )
 }
 \arguments{
@@ -31,6 +32,10 @@ effective_sample_size(
 \item "batch_means": Batch means method
 \item "spectral": Spectral density method
 }}
+
+\item{additional_burnin}{Number of additional stored samples to discard from
+the start of the retained chain. The retained chain is already
+post-burn-in, so this defaults to 0.}
 }
 \value{
 Effective sample size(s) and diagnostic information

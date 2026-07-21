@@ -1,6 +1,35 @@
 # Global variables for data.frame column names
 utils::globalVariables(c("iteration", "logpost", "kstar", "n_strains"))
 
+#' Remove additional burn-in samples from MCMC results
+#'
+#' Stored MCMC samples already exclude burn-in, so this returns the full stored
+#' chain unless \code{additional_burnin} asks for further trimming.
+#'
+#' @param results SNP-Slice results object
+#' @param additional_burnin Number of additional stored samples to discard from
+#'   the start of the retained chain
+#'
+#' @return List of MCMC samples
+#' @keywords internal
+retained_samples <- function(results, additional_burnin = 0) {
+  if (is.null(results$mcmc_samples)) {
+    stop("MCMC samples not stored. Set store_mcmc = TRUE when running snp_slice()")
+  }
+  if (!is.numeric(additional_burnin) || length(additional_burnin) != 1 ||
+        additional_burnin < 0 || additional_burnin != as.integer(additional_burnin)) {
+    stop("additional_burnin must be a non-negative integer")
+  }
+
+  n <- length(results$mcmc_samples)
+  if (additional_burnin >= n) {
+    stop("additional_burnin (", additional_burnin, ") leaves no samples; only ",
+         n, " retained samples are available")
+  }
+
+  results$mcmc_samples[seq(additional_burnin + 1, n)]
+}
+
 #' Extract strain information from SNP-Slice results
 #'
 #' @param results SNP-Slice results object
@@ -60,9 +89,10 @@ extract_allocations <- function(results) {
 #' @param use_map If \code{TRUE} (default), use MAP only; uncertainty columns
 #'   are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.
 #' @param n_samples When \code{use_map = FALSE}, number of MCMC samples to use
-#'   (capped at available post-burnin samples).
+#'   (capped at the number of retained samples).
 #' @param interval Numeric in (0, 1). Credible interval width when using MCMC
 #'   (e.g. 0.95 for 2.5 and 97.5 percent quantiles).
+#' @inheritParams calculate_allele_frequencies
 #'
 #' @return A data frame with one row per host: host_index, host_id, coi_estimate,
 #'   coi_sd, coi_lower, coi_upper. Uncertainty columns are NA when using MAP or
@@ -80,7 +110,8 @@ extract_allocations <- function(results) {
 calculate_individual_coi <- function(results,
                                     use_map = TRUE,
                                     n_samples = 100,
-                                    interval = 0.95) {
+                                    interval = 0.95,
+                                    additional_burnin = 0) {
   if (!inherits(results, "snp_slice_results")) {
     stop("results must be an snp_slice_results object")
   }
@@ -126,28 +157,18 @@ calculate_individual_coi <- function(results,
     stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
   }
 
-  burnin <- results$parameters$burnin
-  if (!is.numeric(burnin) || burnin < 0) {
-    burnin <- 0
-  }
-  burnin <- as.integer(burnin)
-  all_idx <- seq_along(results$mcmc_samples)
-  post_burnin_idx <- all_idx[all_idx > burnin]
-  n_avail <- length(post_burnin_idx)
-
-  if (n_avail == 0) {
-    stop("No post-burnin MCMC samples available (burnin = ", burnin, ", total samples = ", length(all_idx), ")")
-  }
+  samples <- retained_samples(results, additional_burnin)
+  n_avail <- length(samples)
 
   if (n_samples > n_avail) {
-    warning("Requested ", n_samples, " samples but only ", n_avail, " post-burnin available. Using all post-burnin samples.")
+    warning("Requested ", n_samples, " samples but only ", n_avail, " retained. Using all retained samples.")
     n_samples <- n_avail
   }
 
-  sample_indices <- post_burnin_idx[sample.int(n_avail, n_samples, replace = FALSE)]
+  sample_indices <- sample.int(n_avail, n_samples, replace = FALSE)
 
   coi_matrix <- vapply(sample_indices, function(i) {
-    rowSums(results$mcmc_samples[[i]]$A)
+    rowSums(samples[[i]]$A)
   }, FUN.VALUE = numeric(n_hosts))
 
   probs <- c((1 - interval) / 2, 1 - (1 - interval) / 2)
@@ -171,24 +192,27 @@ calculate_individual_coi <- function(results,
 #'
 #' @param results SNP-Slice results object
 #' @param type Type of plot ("logpost", "kstar", "n_strains")
+#' @inheritParams calculate_allele_frequencies
 #'
 #' @return Plot object (if ggplot2 is available)
 #' @export
-plot_convergence <- function(results, type = "logpost") {
+plot_convergence <- function(results, type = "logpost", additional_burnin = 0) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
-  if (is.null(results$mcmc_samples)) {
-    stop("MCMC samples not stored. Set store_mcmc = TRUE when running snp_slice()")
+
+  if (!type %in% c("logpost", "kstar", "n_strains")) {
+    stop("Invalid plot type. Choose from: 'logpost', 'kstar', 'n_strains'")
   }
-  
-  # Extract MCMC samples
-  samples <- results$mcmc_samples
-  
+
+  # Extract retained (post-burn-in) MCMC samples
+  samples <- retained_samples(results, additional_burnin)
+
+  # True chain positions, so the x-axis starts after burn-in
+  iterations <- vapply(samples, function(s) s$iteration, numeric(1))
+
   if (type == "logpost") {
     logpost_values <- sapply(samples, function(s) s$logpost)
-    iterations <- 1:length(logpost_values)
     plot_data <- data.frame(
       iteration = iterations,
       logpost = logpost_values
@@ -209,7 +233,6 @@ plot_convergence <- function(results, type = "logpost") {
     }
   } else if (type == "kstar") {
     kstar_values <- sapply(samples, function(s) s$kstar)
-    iterations <- 1:length(kstar_values)
     plot_data <- data.frame(
       iteration = iterations,
       kstar = kstar_values
@@ -230,7 +253,6 @@ plot_convergence <- function(results, type = "logpost") {
     }
   } else if (type == "n_strains") {
     n_strains_values <- sapply(samples, function(s) sum(colSums(s$A) > 0))
-    iterations <- 1:length(n_strains_values)
     plot_data <- data.frame(
       iteration = iterations,
       n_strains = n_strains_values
@@ -249,8 +271,6 @@ plot_convergence <- function(results, type = "logpost") {
            main = "Number of Strains",
            xlab = "MCMC Iteration", ylab = "Number of Strains")
     }
-  } else {
-    stop("Invalid plot type. Choose from: 'logpost', 'kstar', 'n_strains'")
   }
 }
 
@@ -270,22 +290,20 @@ plot_convergence <- function(results, type = "logpost") {
 #'   - "autocorrelation": Standard autocorrelation-based ESS (default)
 #'   - "batch_means": Batch means method
 #'   - "spectral": Spectral density method
+#' @inheritParams calculate_allele_frequencies
 #'
 #' @return Effective sample size(s) and diagnostic information
 #' @export
 #' @importFrom stats acf var
-effective_sample_size <- function(results, parameter = "logpost", method = "autocorrelation") {
+effective_sample_size <- function(results, parameter = "logpost", method = "autocorrelation",
+                                  additional_burnin = 0) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
-  if (is.null(results$mcmc_samples)) {
-    stop("MCMC samples not stored. Set store_mcmc = TRUE when running snp_slice()")
-  }
-  
-  samples <- results$mcmc_samples
+
+  samples <- retained_samples(results, additional_burnin)
   n_samples <- length(samples)
-  
+
   if (n_samples < 2) {
     warning("Insufficient samples for ESS calculation")
     return(list(ess = n_samples, n_samples = n_samples, method = method))
@@ -295,7 +313,7 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
   calculate_ess <- function(values, method) {
     n <- length(values)
     if (n < 2) return(list(ess = n, acf_sum = 0, var_ratio = 1))
-    
+
     if (method == "autocorrelation") {
       # Calculate autocorrelation
       max_lag <- min(n - 1, floor(n/4))  # Use at most 25% of sample size
@@ -351,8 +369,15 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
   # Extract parameter values based on parameter type
   if (parameter == "all") {
     # Calculate ESS for all available parameters
-    available_params <- c("logpost", "kstar", "ktrunc")
-    
+    available_params <- c("logpost", "kstar")
+
+    # Only pass ktrunc if it is available
+    if (all(sapply(samples, function(s) "ktrunc" %in% names(s)))) {
+      available_params <- c(available_params, "ktrunc")
+    } else {
+      warning("ktrunc not available in MCMC samples; skipping it")
+    }
+
     # Check if mu is available
     if (all(sapply(samples, function(s) "mu" %in% names(s)))) {
       available_params <- c(available_params, "mu")
@@ -368,7 +393,7 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
     
     results_list <- list()
     for (param in available_params) {
-      results_list[[param]] <- effective_sample_size(results, param, method)
+      results_list[[param]] <- effective_sample_size(results, param, method, additional_burnin)
     }
     
     class(results_list) <- "ess_all_results"
@@ -381,8 +406,11 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
     values <- sapply(samples, function(s) s$kstar)
     
   } else if (parameter == "ktrunc") {
+    if (!all(sapply(samples, function(s) "ktrunc" %in% names(s)))) {
+      stop("ktrunc parameter not available in MCMC samples")
+    }
     values <- sapply(samples, function(s) s$ktrunc)
-    
+
   } else if (parameter == "n_strains") {
     values <- sapply(samples, function(s) sum(colSums(s$A) > 0))
     
@@ -502,7 +530,7 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
   
   # Calculate ESS for scalar parameters
   ess_result <- calculate_ess(values, method)
-  
+
   # Add diagnostic information
   result <- list(
     parameter = parameter,
@@ -569,6 +597,9 @@ summary.snp_slice_results <- function(object, ...) {
   if (!is.null(object$convergence)) {
     cat("Convergence:\n")
     cat("- Iterations run:", object$convergence$iterations_run, "\n")
+    if (!is.null(object$convergence$samples_retained)) {
+      cat("- Samples retained (post-burn-in):", object$convergence$samples_retained, "\n")
+    }
     cat("- Gap Converged:", ifelse(object$convergence$gap_converged, "Yes", "No"), "\n")
   }
   

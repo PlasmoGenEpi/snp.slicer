@@ -189,27 +189,24 @@ validate_parameters <- function(alpha, rho, threshold) {
 
 #' Validate MCMC settings
 #'
-#' @param n_mcmc Number of MCMC iterations
-#' @param burnin Burn-in period
+#' @param n_sample Number of post-burn-in iterations to retain
+#' @param n_burnin Number of iterations discarded before sampling begins
 #' @param gap Early stopping threshold
 #'
 #' @return TRUE if valid, otherwise throws error
 #' @keywords internal
-validate_mcmc_settings <- function(n_mcmc, burnin, gap) {
-  
-  if (!is.numeric(n_mcmc) || n_mcmc <= 0 || n_mcmc != as.integer(n_mcmc)) {
-    stop("n_mcmc must be a positive integer")
+validate_mcmc_settings <- function(n_sample, n_burnin, gap) {
+
+  if (!is.numeric(n_sample) || n_sample <= 0 || n_sample != as.integer(n_sample)) {
+    stop("n_sample must be a positive integer")
   }
-  
-  if (!is.null(burnin)) {
-    if (!is.numeric(burnin) || burnin < 0 || burnin != as.integer(burnin)) {
-      stop("burnin must be a non-negative integer")
-    }
-    if (burnin >= n_mcmc) {
-      stop("burnin must be less than n_mcmc")
+
+  if (!is.null(n_burnin)) {
+    if (!is.numeric(n_burnin) || n_burnin < 0 || n_burnin != as.integer(n_burnin)) {
+      stop("n_burnin must be a non-negative integer")
     }
   }
-  
+
   if (!is.null(gap)) {
     if (!is.numeric(gap) || gap <= 0 || gap != as.integer(gap)) {
       stop("gap must be a positive integer")
@@ -578,7 +575,8 @@ create_results_object <- function(mcmc_result, model_obj, processed_data) {
 #' Load Example Analysis Results
 #'
 #' Loads pre-computed SNP-Slice analysis results from the example data.
-#' These results were generated using the negative binomial model with 2000 MCMC iterations.
+#' These results were generated using the negative binomial model with 1000
+#' burn-in iterations followed by 1000 retained samples.
 #'
 #' @return A \code{snp_slice_results} object containing the analysis results
 #' @export
@@ -599,9 +597,10 @@ load_example_results <- function() {
     
     # Run analysis
     set.seed(123)
-    result <- snp_slice(data, 
+    result <- snp_slice(data,
                        model = "negative_binomial",
-                       n_mcmc = 2000,
+                       n_sample = 1000,
+                       n_burnin = 1000,
                        store_mcmc = TRUE,
                        verbose = FALSE)
     
@@ -654,6 +653,9 @@ load_example_results <- function() {
 #' @param n_samples Number of MCMC samples to use if use_map = FALSE (default: 100)
 #' @param interval Numeric in (0, 1). Credible interval width when using MCMC (e.g. 0.95).
 #' @param allele_sep Separator for allele strings (default: "|")
+#' @param additional_burnin Number of additional stored samples to discard from
+#'   the start of the retained chain. The retained chain is already
+#'   post-burn-in, so this defaults to 0.
 #'
 #' @return The structure depends on \code{use_map}. \describe{
 #'   \item{MAP (\code{use_map = TRUE})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele in the MAP allocation), \code{total_parasites} (total parasites in the MAP allocation; same for every row).}
@@ -679,7 +681,7 @@ load_example_results <- function() {
 #'   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
 #'   print(allele_freqs_mcmc)
 #' }
-calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|") {
+calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|", additional_burnin = 0) {
   if (length(unique(snp_indices)) != length(snp_indices)) {
     stop("snp_indices must be unique")
   }
@@ -738,14 +740,15 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
     if (is.null(results$mcmc_samples)) {
       stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
     }
-    n_total_samples <- length(results$mcmc_samples)
+    samples <- retained_samples(results, additional_burnin)
+    n_total_samples <- length(samples)
     if (n_samples > n_total_samples) {
-      warning("Requested ", n_samples, " samples but only ", n_total_samples, " available. Using all available samples.")
+      warning("Requested ", n_samples, " samples but only ", n_total_samples, " retained. Using all retained samples.")
       n_samples <- n_total_samples
     }
     sample_indices <- sample(seq_len(n_total_samples), n_samples, replace = FALSE)
     allele_counts_list <- lapply(sample_indices, function(i) {
-      sample_data <- results$mcmc_samples[[i]]
+      sample_data <- samples[[i]]
       calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep)
     })
     result_df <- summarize_allele_frequencies_mcmc(allele_counts_list, interval = interval, n_samples = n_samples)
@@ -765,10 +768,7 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 #' @param target_sets List of vectors; each element is target indices (integer)
 #'   or target names (character) defining one set. If the list is named, those
 #'   names are used for the returned list.
-#' @param use_map Logical; use MAP estimates (TRUE) or sample from MCMC (FALSE).
-#' @param n_samples Number of MCMC samples to use if \code{use_map = FALSE} (default: 100).
-#' @param interval Credible interval width when \code{use_map = FALSE} (e.g. 0.95).
-#' @param allele_sep Separator for allele strings (default: "|").
+#' @param ... Arguments passed on to \code{\link{calculate_allele_frequencies}}.
 #'
 #' @return A named list of data frames, one per target set. List names come from
 #'   \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc. Each data frame
@@ -785,7 +785,7 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 #' target_sets <- list(locus_a = c(1, 5), locus_b = c(10))
 #' freqs <- calculate_allele_frequencies_by_sets(result, target_sets)
 #' print(freqs$locus_a)
-calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|") {
+calculate_allele_frequencies_by_sets <- function(results, target_sets, ...) {
   if (!is.list(target_sets)) {
     stop("target_sets must be a list")
   }
@@ -799,7 +799,7 @@ calculate_allele_frequencies_by_sets <- function(results, target_sets, use_map =
     }
   }
   out <- lapply(target_sets, function(set) {
-    calculate_allele_frequencies(results, snp_indices = set, use_map = use_map, n_samples = n_samples, interval = interval, allele_sep = allele_sep)
+    calculate_allele_frequencies(results, snp_indices = set, ...)
   })
   if (!is.null(names(target_sets))) {
     names(out) <- names(target_sets)

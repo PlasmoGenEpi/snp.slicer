@@ -71,8 +71,7 @@ test_that("calculate_individual_coi with MCMC samples (use_map = FALSE)", {
     model_info = list(processed_data = list(specimen_ids = NULL)),
     mcmc_samples = list(
       list(A = A), list(A = A), list(A = A), list(A = A), list(A = A)
-    ),
-    parameters = list(burnin = 1)
+    )
   )
   class(test_result) <- "snp_slice_results"
 
@@ -183,8 +182,8 @@ test_that("plot_convergence validates input", {
   
   # Test with invalid plot type
   test_result$mcmc_samples <- list(
-    list(logpost = -10, kstar = 2, A = matrix(1, 2, 2)),
-    list(logpost = -9, kstar = 2, A = matrix(1, 2, 2))
+    list(logpost = -10, kstar = 2, A = matrix(1, 2, 2), iteration = 1),
+    list(logpost = -9, kstar = 2, A = matrix(1, 2, 2), iteration = 2)
   )
   
   expect_error(plot_convergence(test_result, type = "invalid"), 
@@ -207,8 +206,8 @@ test_that("effective_sample_size validates input", {
   
   # Test with invalid parameter
   test_result$mcmc_samples <- list(
-    list(logpost = -10, kstar = 2, A = matrix(1, 2, 2)),
-    list(logpost = -9, kstar = 2, A = matrix(1, 2, 2))
+    list(logpost = -10, kstar = 2, A = matrix(1, 2, 2), iteration = 1),
+    list(logpost = -9, kstar = 2, A = matrix(1, 2, 2), iteration = 2)
   )
   
   expect_error(effective_sample_size(test_result, parameter = "invalid"), 

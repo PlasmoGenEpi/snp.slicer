@@ -140,7 +140,7 @@ If you want to run the analysis yourself, here's how to do it:
 data <- list(read0 = read0, read1 = read1)
 result <- snp_slice(data, 
                    model = "negative_binomial",
-                   n_mcmc = 2000,      # Number of MCMC iterations
+                   n_sample = 2000,      # Number of retained (post-burn-in) samples
                    store_mcmc = TRUE,  # Store MCMC samples for diagnostics
                    verbose = TRUE)     # Show progress
 ```
@@ -155,8 +155,8 @@ result_tuned <- snp_slice(data,
                          alpha = 1.5,        # IBP concentration parameter
                          rho = 0.3,          # Dictionary sparsity
                          threshold = 0.005,  # Single infection threshold
-                         n_mcmc = 2000,
-                         burnin = 500,       # Custom burn-in
+                         n_sample = 2000,
+                         n_burnin = 500,       # Custom burn-in
                          gap = 10,           # Early stopping threshold
                          seed = 456,         # Reproducibility
                          verbose = FALSE)
@@ -351,7 +351,7 @@ This vignette covered the basics of using SNP-Slice with the negative binomial m
 - **Other models**: Try Poisson, binomial, or categorical models via the `model` argument in `snp_slice()`.
 - **Diagnostics**: Use `?effective_sample_size` and `?plot_convergence` when MCMC samples are stored.
 - **Your data**: Apply SNP-Slice to your own read count or categorical data; see `?snp_slice` and `?load_example_results` for input format and examples.
-- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `burnin`, and `gap` for your application.
+- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `n_burnin`, and `gap` for your application.
 
 ## References
 

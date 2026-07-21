@@ -62,7 +62,7 @@ test_that("snp_slice_categorical runs with long-format data.frame", {
     target_value = c("ref", "ref", "alt", "alt"),
     target_count = c(5, 0, 0, 3)
   )
-  result <- snp_slice_categorical(df, n_mcmc = 25, verbose = FALSE)
+  result <- snp_slice_categorical(df, n_sample = 25, verbose = FALSE)
   expect_s3_class(result, "snp_slice_results")
   expect_equal(result$model_info$model, "categorical")
   expect_equal(result$model_info$data_type, "categorical")
@@ -78,7 +78,7 @@ test_that("categorical data.frame with zero total count yields NA and does not b
   out <- snp.slicer:::preprocess_data(df, model = "categorical")
   expect_true(is.na(out$y["s2", "t2"]))
   expect_no_error(
-    snp_slice_categorical(df, n_mcmc = 25, verbose = FALSE)
+    snp_slice_categorical(df, n_sample = 25, verbose = FALSE)
   )
 })
 

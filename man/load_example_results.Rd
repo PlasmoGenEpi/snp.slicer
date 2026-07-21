@@ -11,7 +11,8 @@ A \code{snp_slice_results} object containing the analysis results
 }
 \description{
 Loads pre-computed SNP-Slice analysis results from the example data.
-These results were generated using the negative binomial model with 2000 MCMC iterations.
+These results were generated using the negative binomial model with 1000
+burn-in iterations followed by 1000 retained samples.
 }
 \examples{
 # Load the pre-computed results

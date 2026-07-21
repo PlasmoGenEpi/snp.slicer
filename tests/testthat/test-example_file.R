@@ -19,7 +19,7 @@ test_that("example categorical file can be processed and run", {
   # Test running SNP-Slice with the categorical model
   expect_no_error({
     result <- snp_slice_categorical(small_data, 
-                                   n_mcmc = 25,  # Short run for testing
+                                   n_sample = 25,  # Short run for testing
                                    verbose = FALSE,
                                    store_mcmc = TRUE)
   })

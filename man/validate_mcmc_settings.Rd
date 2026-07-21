@@ -4,12 +4,12 @@
 \alias{validate_mcmc_settings}
 \title{Validate MCMC settings}
 \usage{
-validate_mcmc_settings(n_mcmc, burnin, gap)
+validate_mcmc_settings(n_sample, n_burnin, gap)
 }
 \arguments{
-\item{n_mcmc}{Number of MCMC iterations}
+\item{n_sample}{Number of post-burn-in iterations to retain}
 
-\item{burnin}{Burn-in period}
+\item{n_burnin}{Number of iterations discarded before sampling begins}
 
 \item{gap}{Early stopping threshold}
 }

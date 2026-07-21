@@ -4,14 +4,7 @@
 \alias{calculate_allele_frequencies_by_sets}
 \title{Calculate allele frequencies for multiple target sets}
 \usage{
-calculate_allele_frequencies_by_sets(
-  results,
-  target_sets,
-  use_map = TRUE,
-  n_samples = 100,
-  interval = 0.95,
-  allele_sep = "|"
-)
+calculate_allele_frequencies_by_sets(results, target_sets, ...)
 }
 \arguments{
 \item{results}{A \code{snp_slice_results} object containing MCMC results.}
@@ -20,13 +13,7 @@ calculate_allele_frequencies_by_sets(
 or target names (character) defining one set. If the list is named, those
 names are used for the returned list.}
 
-\item{use_map}{Logical; use MAP estimates (TRUE) or sample from MCMC (FALSE).}
-
-\item{n_samples}{Number of MCMC samples to use if \code{use_map = FALSE} (default: 100).}
-
-\item{interval}{Credible interval width when \code{use_map = FALSE} (e.g. 0.95).}
-
-\item{allele_sep}{Separator for allele strings (default: "|").}
+\item{...}{Arguments passed on to \code{\link{calculate_allele_frequencies}}.}
 }
 \value{
 A named list of data frames, one per target set. List names come from

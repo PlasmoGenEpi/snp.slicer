@@ -10,7 +10,8 @@ calculate_allele_frequencies(
   use_map = TRUE,
   n_samples = 100,
   interval = 0.95,
-  allele_sep = "|"
+  allele_sep = "|",
+  additional_burnin = 0
 )
 }
 \arguments{
@@ -25,6 +26,10 @@ calculate_allele_frequencies(
 \item{interval}{Numeric in (0, 1). Credible interval width when using MCMC (e.g. 0.95).}
 
 \item{allele_sep}{Separator for allele strings (default: "|")}
+
+\item{additional_burnin}{Number of additional stored samples to discard from
+the start of the retained chain. The retained chain is already
+post-burn-in, so this defaults to 0.}
 }
 \value{
 The structure depends on \code{use_map}. \describe{

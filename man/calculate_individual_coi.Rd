@@ -8,7 +8,8 @@ calculate_individual_coi(
   results,
   use_map = TRUE,
   n_samples = 100,
-  interval = 0.95
+  interval = 0.95,
+  additional_burnin = 0
 )
 }
 \arguments{
@@ -18,10 +19,14 @@ calculate_individual_coi(
 are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.}
 
 \item{n_samples}{When \code{use_map = FALSE}, number of MCMC samples to use
-(capped at available post-burnin samples).}
+(capped at the number of retained samples).}
 
 \item{interval}{Numeric in (0, 1). Credible interval width when using MCMC
 (e.g. 0.95 for 2.5 and 97.5 percent quantiles).}
+
+\item{additional_burnin}{Number of additional stored samples to discard from
+the start of the retained chain. The retained chain is already
+post-burn-in, so this defaults to 0.}
 }
 \value{
 A data frame with one row per host: host_index, host_id, coi_estimate,
