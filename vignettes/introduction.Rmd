@@ -74,9 +74,9 @@ cat("Hosts:", allocations$n_hosts, "\n")
 cat("Multiplicity of infection (MOI) summary:\n")
 print(summary(allocations$multiplicity_of_infection))
 
-# Key matrices (also available as result$allocation_matrix, result$dictionary_matrix)
-A <- result$allocation_matrix   # Hosts × Strains
-D <- result$dictionary_matrix   # Strains × SNPs
+# Key matrices
+A <- allocations$allocation_matrix   # Hosts × Strains
+D <- strains$dictionary              # Strains × SNPs
 
 cat("Allocation matrix:", dim(A), "| Dictionary matrix:", dim(D), "\n")
 print("Sample allocation (first 3 hosts, first 5 strains):")
@@ -97,7 +97,7 @@ allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 
 # With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
-if (!is.null(result$mcmc_samples)) {
+if (!is.null(get_chain(result)$mcmc_samples)) {
   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
   head(allele_freqs_mcmc)
 }
@@ -123,7 +123,7 @@ coi_map <- calculate_individual_coi(result, use_map = TRUE)
 head(coi_map)
 
 # With posterior uncertainty (requires store_mcmc = TRUE)
-if (!is.null(result$mcmc_samples)) {
+if (!is.null(get_chain(result)$mcmc_samples)) {
   coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50, interval = 0.95)
   head(coi_post)
   cat("\nSummary of COI posterior SD:\n")
@@ -167,7 +167,7 @@ result_tuned <- snp_slice(data,
 When you store MCMC samples (`store_mcmc = TRUE`), you can assess convergence with effective sample size (ESS) and trace plots:
 
 ```{r, fig.alt = "Trace plot of log posterior over MCMC iterations."}
-if (!is.null(result$mcmc_samples)) {
+if (!is.null(get_chain(result)$mcmc_samples)) {
   # Effective sample size for log posterior
   ess_logpost <- effective_sample_size(result, parameter = "logpost")
   ess_val <- if (is.numeric(ess_logpost)) ess_logpost else ess_logpost$ess

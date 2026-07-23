@@ -195,7 +195,7 @@ validate_parameters <- function(alpha, rho, threshold) {
 #'
 #' @return TRUE if valid, otherwise throws error
 #' @keywords internal
-validate_mcmc_settings <- function(n_sample, n_burnin, gap) {
+validate_mcmc_settings <- function(n_sample, n_burnin, gap, n_chains = 1, n_cores = 1) {
 
   if (!is.numeric(n_sample) || n_sample <= 0 || n_sample != as.integer(n_sample)) {
     stop("n_sample must be a positive integer")
@@ -212,7 +212,17 @@ validate_mcmc_settings <- function(n_sample, n_burnin, gap) {
       stop("gap must be a positive integer")
     }
   }
-  
+
+  if (!is.numeric(n_chains) || length(n_chains) != 1 || n_chains <= 0 ||
+        n_chains != as.integer(n_chains)) {
+    stop("n_chains must be a positive integer")
+  }
+
+  if (!is.numeric(n_cores) || length(n_cores) != 1 || n_cores <= 0 ||
+        n_cores != as.integer(n_cores)) {
+    stop("n_cores must be a positive integer")
+  }
+
   return(TRUE)
 }
 
@@ -543,33 +553,51 @@ read_snp_data <- function(file_path, format = "auto") {
 #' @return snp_slice_results object
 #' @keywords internal
 create_results_object <- function(mcmc_result, model_obj, processed_data) {
-  
-  # Extract MAP estimates
-  map_state <- mcmc_result$map_state
-  
-  # Get active strains only
-  active_strains <- colSums(map_state$A) > 0
-  allocation_matrix <- map_state$A[, active_strains, drop = FALSE]
-  dictionary_matrix <- map_state$D[active_strains, , drop = FALSE]
-  
+
+  chains <- lapply(mcmc_result$chains, function(chain) {
+    chain_maps <- map_estimates(chain$map_state)
+    list(
+      chain_id = chain$chain_id,
+      seed = chain$seed,
+      allocation_matrix = chain_maps$allocation_matrix,
+      dictionary_matrix = chain_maps$dictionary_matrix,
+      mcmc_samples = chain$samples,
+      diagnostics = chain$diagnostics,
+      convergence = chain$convergence,
+      performance = chain$performance
+    )
+  })
+
   # Create results object
   results <- list(
-    allocation_matrix = allocation_matrix,
-    dictionary_matrix = dictionary_matrix,
-    mcmc_samples = mcmc_result$samples,
-    diagnostics = mcmc_result$diagnostics,
+    chains = chains,
+    best_chain = mcmc_result$best_chain,
     parameters = mcmc_result$parameters,
     model_info = list(
       model = model_obj$name,
       data_type = processed_data$data_type,
       processed_data = processed_data
-    ),
-    convergence = mcmc_result$convergence
+    )
   )
-  
+
   class(results) <- "snp_slice_results"
-  
+
   return(results)
+}
+
+#' Extract MAP allocation and dictionary matrices from a chain state
+#'
+#' @param map_state MAP state of a chain
+#'
+#' @return List with \code{allocation_matrix} and \code{dictionary_matrix},
+#'   restricted to strains with at least one host
+#' @keywords internal
+map_estimates <- function(map_state) {
+  active_strains <- colSums(map_state$A) > 0
+  list(
+    allocation_matrix = map_state$A[, active_strains, drop = FALSE],
+    dictionary_matrix = map_state$D[active_strains, , drop = FALSE]
+  )
 }
 
 #' Load Example Analysis Results
@@ -656,6 +684,10 @@ load_example_results <- function() {
 #' @param additional_burnin Number of additional stored samples to discard from
 #'   the start of the retained chain. The retained chain is already
 #'   post-burn-in, so this defaults to 0.
+#' @param chain Which chain of a multi-chain run to use. \code{NULL} (default)
+#'   uses the top-level estimates, i.e. the chain with the highest MAP log
+#'   posterior (\code{results$best_chain}). Give an index to analyse a specific
+#'   chain instead; see \code{\link{compare_chains}}.
 #'
 #' @return The structure depends on \code{use_map}. \describe{
 #'   \item{MAP (\code{use_map = TRUE})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele in the MAP allocation), \code{total_parasites} (total parasites in the MAP allocation; same for every row).}
@@ -677,13 +709,17 @@ load_example_results <- function() {
 #' print(allele_freqs)
 #'
 #' # With MCMC: posterior mean, SD, credible interval, and per-sample mean count
-#' if (!is.null(result$mcmc_samples)) {
+#' if (!is.null(get_chain(result)$mcmc_samples)) {
 #'   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
 #'   print(allele_freqs_mcmc)
 #' }
-calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|", additional_burnin = 0) {
+calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|", additional_burnin = 0, chain = NULL) {
   if (length(unique(snp_indices)) != length(snp_indices)) {
     stop("snp_indices must be unique")
+  }
+
+  if (inherits(results, "snp_slice_results")) {
+    results <- resolve_chain(results, chain)
   }
 
   if (is.character(snp_indices)) {

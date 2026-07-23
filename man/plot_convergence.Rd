@@ -4,7 +4,12 @@
 \alias{plot_convergence}
 \title{Plot convergence diagnostics}
 \usage{
-plot_convergence(results, type = "logpost", additional_burnin = 0)
+plot_convergence(
+  results,
+  type = "logpost",
+  additional_burnin = 0,
+  chain = NULL
+)
 }
 \arguments{
 \item{results}{SNP-Slice results object}
@@ -14,6 +19,11 @@ plot_convergence(results, type = "logpost", additional_burnin = 0)
 \item{additional_burnin}{Number of additional stored samples to discard from
 the start of the retained chain. The retained chain is already
 post-burn-in, so this defaults to 0.}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 Plot object (if ggplot2 is available)

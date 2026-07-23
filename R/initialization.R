@@ -91,7 +91,10 @@ create_model <- function(
   return(model_obj)
 }
 
-#' Run MCMC for SNP-Slice
+#' Run a single MCMC chain for SNP-Slice
+#'
+#' This function runs a single MCMC chain for a configured snp.slicer 
+#' model object.
 #'
 #' @param model_obj Model object
 #' @param n_sample Number of post-burn-in iterations to retain
@@ -99,23 +102,34 @@ create_model <- function(
 #' @param gap Early stopping threshold
 #' @param verbose Whether to print progress
 #' @param store_mcmc Whether to store full MCMC samples
+#' @param chain_id Integer identifier of this chain (1 when running one chain)
+#' @param seed Integer seed for this chain
 #'
-#' @details Only sampling iterations are returned when \code{store_mcmc = TRUE}.
+#' @details Sampling iterations are returned when \code{store_mcmc = TRUE}.
 #'
 #' @return MCMC results
 #' @keywords internal
-run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
-  
+run_chain <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc,
+                      chain_id = 1L, seed = NULL) {
+
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  # Prefix progress output so interleaved chain output stays readable
+  prefix <- if (is.null(chain_id)) "" else paste0("[chain ", chain_id, "] ")
+  cat_w_prefix <- function(...) cat(prefix, ..., sep = "")
+
   # Initialize state
   if (verbose) {
-    cat("Initializing state...\n")
+    cat_w_prefix("Initializing state...\n")
   }
-  
+
   state <- model_obj$initialize_state(model_obj, threshold = 0.001)
   
   if (verbose) {
-    cat("Initialization complete, log-likelihood:", state$loglik, "\n")
-    cat("Starting with", sum(rowSums(state$A) == 1), "single infections\n")
+    cat_w_prefix("Initialization complete, log-likelihood: ", state$loglik, "\n")
+    cat_w_prefix("Starting with ", sum(rowSums(state$A) == 1), " single infections\n")
   }
   
   # Initialize slice sampler
@@ -124,8 +138,8 @@ run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
   total_iter <- n_burnin + n_sample
 
   if (verbose) {
-    cat("Plan to run", total_iter, "total iterations:", n_burnin, "burn-in +",
-        n_sample, "sampling, gap =", gap, "\n")
+    cat_w_prefix("Plan to run ", total_iter, " total iterations: ", n_burnin, " burn-in + ",
+        n_sample, " sampling, gap = ", if (is.null(gap)) "NULL" else gap, "\n")
   }
 
   # Clear performance log before starting
@@ -185,16 +199,16 @@ run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
 
     # Print progress
     if (verbose && iter %% 10 == 0) {
-      cat("Iteration", iter, "active strains:", sum(colSums(state$A) > 0),
-          "kstar:", state$kstar, "ktrunc:", state$ktrunc,
-          "single infections:", sum(rowSums(state$A) == 1),
-          "logpost:", round(state$logpost, 2), "max:", round(lpostmax, 2), "\n")
+      cat_w_prefix("Iteration ", iter, " active strains: ", sum(colSums(state$A) > 0),
+          " kstar: ", state$kstar, " ktrunc: ", state$ktrunc,
+          " single infections: ", sum(rowSums(state$A) == 1),
+          " logpost: ", round(state$logpost, 2), " max: ", round(lpostmax, 2), "\n")
     }
-    
+
     # Check for early stopping
     if (iter > n_burnin && !is.null(gap) && mapiter < iter - gap) {
       if (verbose) {
-        cat("Early stopping at iteration", iter, "due to convergence\n")
+        cat_w_prefix("Early stopping at iteration ", iter, " due to convergence\n")
       }
       break
     }
@@ -207,6 +221,8 @@ run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
 
   # Create diagnostics
   diagnostics <- list(
+    chain_id = chain_id,
+    seed = seed,
     final_iteration = iter,
     map_iteration = mapiter,
     final_logpost = state$logpost,
@@ -219,6 +235,8 @@ run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
   
   # Create results
   result <- list(
+    chain_id = chain_id,
+    seed = seed,
     map_state = map_state,
     final_state = state,
     samples = samples,
@@ -233,9 +251,10 @@ run_mcmc <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc) {
       gap_converged = !is.null(gap) && mapiter < iter - gap,
       iterations_run = iter,
       samples_retained = max(0, iter - n_burnin)
-    )
+    ),
+    performance = get_performance_summary()
   )
-  
+
   return(result)
 }
 

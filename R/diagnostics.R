@@ -30,17 +30,134 @@ retained_samples <- function(results, additional_burnin = 0) {
   results$mcmc_samples[seq(additional_burnin + 1, n)]
 }
 
-#' Extract strain information from SNP-Slice results
+#' Resolve the chain a diagnostic function should use
+#'
+#' Diagnostics take a \code{chain} argument rather than requiring a results
+#' object that holds a single chain. \code{NULL} (the default everywhere) means
+#' the best chain.
 #'
 #' @param results SNP-Slice results object
+#' @param chain Chain index, or \code{NULL} for the best chain
 #'
-#' @return List containing strain information
+#' @return A single-chain results object, as returned by \code{\link{get_chain}}
+#' @keywords internal
+resolve_chain <- function(results, chain = NULL) {
+  if (is.null(chain)) {
+    chain <- results$best_chain
+  }
+  get_chain(results, chain)
+}
+
+#' Extract a single chain as a results object
+#'
+#' @description
+#' A results object stores every chain identically in \code{results$chains} and
+#' keeps no estimates of its own. This function flattens one chain into a
+#' standalone \code{snp_slice_results} object carrying that chain's
+#' \code{allocation_matrix}, \code{dictionary_matrix}, and \code{mcmc_samples},
+#' which is how the estimates of a run are reached. Diagnostic functions call it
+#' for you via their \code{chain} argument.
+#'
+#' @param results SNP-Slice results object
+#' @param chain Index of the chain to extract (defaults to the best chain)
+#'
+#' @return An \code{snp_slice_results} object for the requested chain
 #' @export
-extract_strains <- function(results) {
+#' @examples
+#' result <- load_example_results()
+#' chain1 <- get_chain(result, 1)
+#' summary(chain1)
+#' dim(chain1$allocation_matrix)
+get_chain <- function(results, chain = results$best_chain) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
+
+  if (is.null(results$chains)) {
+    if (!is.null(chain) && !identical(as.integer(chain), 1L)) {
+      stop("chain must be 1: this object already holds a single chain")
+    }
+    return(results)
+  }
+
+  chains <- results$chains
+  if (is.null(chain)) {
+    chain <- results$best_chain
+  }
+  if (!is.numeric(chain) || length(chain) != 1 || chain < 1 ||
+        chain > length(chains)) {
+    stop("chain must be an integer between 1 and ", length(chains))
+  }
+
+  chain_result <- chains[[chain]]
+
+  out <- list(
+    chain_id = chain_result$chain_id,
+    seed = chain_result$seed,
+    allocation_matrix = chain_result$allocation_matrix,
+    dictionary_matrix = chain_result$dictionary_matrix,
+    mcmc_samples = chain_result$mcmc_samples,
+    diagnostics = chain_result$diagnostics,
+    convergence = chain_result$convergence,
+    performance = chain_result$performance,
+    parameters = results$parameters,
+    model_info = results$model_info
+  )
+
+  class(out) <- "snp_slice_results"
+  out
+}
+
+#' Compare chains from a multi-chain run
+#'
+#' @param results SNP-Slice results object
+#'
+#' @return A data frame with one row per chain: chain, seed, iterations_run,
+#'   map_logpost, final_logpost, map_kstar, n_strains, gap_converged, and
+#'   whether the chain was selected as best
+#' @export
+#' @examples
+#' result <- load_example_results()
+#' compare_chains(result)
+compare_chains <- function(results) {
+  if (!inherits(results, "snp_slice_results")) {
+    stop("Input must be an snp_slice_results object")
+  }
+  if (is.null(results$chains)) {
+    stop("results has no chains; it was produced by a version of snp.slicer ",
+         "that predates multi-chain support. Re-run snp_slice() to use this function")
+  }
+  chains <- results$chains
+
+  data.frame(
+    chain = vapply(chains, function(x) as.integer(x$chain_id), integer(1)),
+    seed = vapply(chains, function(x) as.numeric(x$seed), numeric(1)),
+    iterations_run = vapply(chains,
+                            function(x) as.integer(x$convergence$iterations_run), integer(1)),
+    map_logpost = vapply(chains, function(x) x$diagnostics$map_logpost, numeric(1)),
+    final_logpost = vapply(chains, function(x) x$diagnostics$final_logpost, numeric(1)),
+    map_kstar = vapply(chains, function(x) as.integer(x$diagnostics$map_kstar), integer(1)),
+    n_strains = vapply(chains, function(x) nrow(x$dictionary_matrix), integer(1)),
+    gap_converged = vapply(chains,
+                           function(x) isTRUE(x$convergence$gap_converged), logical(1)),
+    best = seq_along(chains) == results$best_chain,
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Extract strain information from SNP-Slice results
+#'
+#' @param results SNP-Slice results object
+#' @inheritParams calculate_allele_frequencies
+#'
+#' @return List containing strain information
+#' @export
+extract_strains <- function(results, chain = NULL) {
+  if (!inherits(results, "snp_slice_results")) {
+    stop("Input must be an snp_slice_results object")
+  }
+  results <- resolve_chain(results, chain)
+
   # Extract strain information
   strains <- list(
     dictionary = results$dictionary_matrix,
@@ -55,14 +172,16 @@ extract_strains <- function(results) {
 #' Extract allocation information from SNP-Slice results
 #'
 #' @param results SNP-Slice results object
+#' @inheritParams calculate_allele_frequencies
 #'
 #' @return List containing allocation information
 #' @export
-extract_allocations <- function(results) {
+extract_allocations <- function(results, chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
+  results <- resolve_chain(results, chain)
+
   # Extract allocation information
   n_hosts <- nrow(results$allocation_matrix)
   n_strains <- ncol(results$allocation_matrix)
@@ -103,7 +222,7 @@ extract_allocations <- function(results) {
 #' result <- load_example_results()
 #' coi_map <- calculate_individual_coi(result, use_map = TRUE)
 #' head(coi_map)
-#' if (!is.null(result$mcmc_samples)) {
+#' if (!is.null(get_chain(result)$mcmc_samples)) {
 #'   coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50)
 #'   head(coi_post)
 #' }
@@ -111,10 +230,12 @@ calculate_individual_coi <- function(results,
                                     use_map = TRUE,
                                     n_samples = 100,
                                     interval = 0.95,
-                                    additional_burnin = 0) {
+                                    additional_burnin = 0,
+                                    chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("results must be an snp_slice_results object")
   }
+  results <- resolve_chain(results, chain)
   if (!is.logical(use_map) || length(use_map) != 1) {
     stop("use_map must be a single logical value")
   }
@@ -196,10 +317,11 @@ calculate_individual_coi <- function(results,
 #'
 #' @return Plot object (if ggplot2 is available)
 #' @export
-plot_convergence <- function(results, type = "logpost", additional_burnin = 0) {
+plot_convergence <- function(results, type = "logpost", additional_burnin = 0, chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
+  results <- resolve_chain(results, chain)
 
   if (!type %in% c("logpost", "kstar", "n_strains")) {
     stop("Invalid plot type. Choose from: 'logpost', 'kstar', 'n_strains'")
@@ -296,10 +418,11 @@ plot_convergence <- function(results, type = "logpost", additional_burnin = 0) {
 #' @export
 #' @importFrom stats acf var
 effective_sample_size <- function(results, parameter = "logpost", method = "autocorrelation",
-                                  additional_burnin = 0) {
+                                  additional_burnin = 0, chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
+  results <- resolve_chain(results, chain)
 
   samples <- retained_samples(results, additional_burnin)
   n_samples <- length(samples)
@@ -552,16 +675,20 @@ effective_sample_size <- function(results, parameter = "logpost", method = "auto
 #' Print summary of SNP-Slice results
 #'
 #' @param object SNP-Slice results object
+#' @inheritParams calculate_allele_frequencies
 #' @param ... Additional arguments
 #'
 #' @return Summary information
 #' @export
 #' @importFrom stats median
-summary.snp_slice_results <- function(object, ...) {
+summary.snp_slice_results <- function(object, chain = NULL, ...) {
   if (!inherits(object, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
+  # Estimates come from one chain; the chain overview needs the whole object
+  results <- object
+  object <- resolve_chain(results, chain)
+
   cat("SNP-Slice Results Summary\n")
   cat("========================\n\n")
   
@@ -593,6 +720,14 @@ summary.snp_slice_results <- function(object, ...) {
   cat("  - Single infections:", single_infections, "(", round(100 * single_infections / length(moi), 1), "%)\n")
   cat("  - Mixed infections:", mixed_infections, "(", round(100 * mixed_infections / length(moi), 1), "%)\n\n")
   
+  # Chain information
+  n_chains <- length(results$chains)
+  if (n_chains > 1) {
+    cat("Chains:", n_chains, "(best chain:", results$best_chain, ")\n")
+    print(compare_chains(results), row.names = FALSE)
+    cat("\n")
+  }
+
   # Convergence information
   if (!is.null(object$convergence)) {
     cat("Convergence:\n")
@@ -617,21 +752,29 @@ summary.snp_slice_results <- function(object, ...) {
 #' Print SNP-Slice results
 #'
 #' @param x SNP-Slice results object
+#' @inheritParams calculate_allele_frequencies
 #' @param ... Additional arguments
 #'
 #' @return Print information
 #' @export
-print.snp_slice_results <- function(x, ...) {
+print.snp_slice_results <- function(x, chain = NULL, ...) {
   if (!inherits(x, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  
+  n_chains <- length(x$chains)
+  best_chain <- x$best_chain
+  x <- resolve_chain(x, chain)
+
   cat("SNP-Slice Results\n")
   cat("================\n")
   cat("Model:", x$model_info$model, "\n")
   cat("Dimensions:", nrow(x$allocation_matrix), "hosts x", ncol(x$dictionary_matrix), "strains x", ncol(x$dictionary_matrix), "SNPs\n")
   cat("Strains identified:", nrow(x$dictionary_matrix), "\n")
-  
+
+  if (n_chains > 1) {
+    cat("Chains:", n_chains, "(best chain:", best_chain, ")\n")
+  }
+
   if (!is.null(x$convergence)) {
     cat("Gap Converged:", ifelse(x$convergence$gap_converged, "Yes", "No"), "\n")
   }

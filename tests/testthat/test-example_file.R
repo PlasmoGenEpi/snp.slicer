@@ -27,10 +27,10 @@ test_that("example categorical file can be processed and run", {
   # Check that the result has the expected structure
   expect_s3_class(result, "snp_slice_results")
   expect_equal(result$model_info$model, "categorical")
-  expect_true(length(result$mcmc_samples) > 0)
-  expect_true("A" %in% names(result$mcmc_samples[[1]]))
-  expect_true("D" %in% names(result$mcmc_samples[[1]]))
-  expect_true("mu" %in% names(result$mcmc_samples[[1]]))
+  expect_true(length(get_chain(result)$mcmc_samples) > 0)
+  expect_true("A" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("D" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("mu" %in% names(get_chain(result)$mcmc_samples[[1]]))
   
   # Test that we can extract strains and allocations
   expect_no_error({

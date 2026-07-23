@@ -4,10 +4,15 @@
 \alias{extract_strains}
 \title{Extract strain information from SNP-Slice results}
 \usage{
-extract_strains(results)
+extract_strains(results, chain = NULL)
 }
 \arguments{
 \item{results}{SNP-Slice results object}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 List containing strain information

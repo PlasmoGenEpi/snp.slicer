@@ -27,10 +27,11 @@ cat("Read1 range:", range(read1), "\n")
 cat("\nRunning SNP-Slice with negative binomial model...\n")
 cat("This may take a few minutes...\n")
 
-set.seed(123)  # For reproducibility
-result <- snp_slice(data, 
+result <- snp_slice(data,
                    model = "negative_binomial",
-                   n_mcmc = 2000,
+                   n_sample = 1000,
+                   n_burnin = 1000,
+                   seed = 123,  # For reproducibility
                    store_mcmc = TRUE,
                    verbose = TRUE)
 

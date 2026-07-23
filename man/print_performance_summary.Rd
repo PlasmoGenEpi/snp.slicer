@@ -4,7 +4,12 @@
 \alias{print_performance_summary}
 \title{Print performance summary}
 \usage{
-print_performance_summary()
+print_performance_summary(summary = get_performance_summary())
+}
+\arguments{
+\item{summary}{Performance summary data frame. Defaults to the log of the
+current process; pass a chain's stored \code{performance} table when the
+chain ran in a separate process.}
 }
 \description{
 Print performance summary

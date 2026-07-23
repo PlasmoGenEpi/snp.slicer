@@ -24,7 +24,14 @@
 #' @param threshold Threshold for identifying single infections (default: 0.001).
 #' @param gap Early stopping threshold. If NULL, runs for all
 #'   \code{n_burnin + n_sample} iterations.
-#' @param seed Random seed for reproducibility.
+#' @param n_chains Number of independent MCMC chains to run (default: 1). Each
+#'   chain is seeded separately; the chain reaching the highest MAP log
+#'   posterior supplies the top-level estimates and all chains are kept in
+#'   \code{result$chains}.
+#' @param n_cores Number of cores used to run chains simultaneously
+#'   (default: 1, i.e. chains run sequentially). Capped at \code{n_chains}.
+#' @param seed Random seed for reproducibility. Per-chain seeds are based on 
+#'   this seed, so a full multi-chain run is reproducible.
 #' @param verbose Whether to print progress information (default: TRUE).
 #' @param log_performance Whether to log performance metrics (default: FALSE).
 #' @param store_mcmc Whether to store full MCMC samples (default: FALSE).
@@ -32,12 +39,17 @@
 #' @param ... Additional model-specific parameters.
 #'
 #' @return An object of class `snp_slice_results` containing:
-#'   - `allocation_matrix`: Binary allocation matrix (A)
-#'   - `dictionary_matrix`: Binary dictionary matrix (D)
-#'   - `mcmc_samples`: MCMC samples (if store_mcmc = TRUE)
-#'   - `diagnostics`: Convergence diagnostics
-#'   - `parameters`: Model parameters used
+#'   - `chains`: Per-chain results, all stored the same way. Each holds that
+#'     chain's `allocation_matrix` (A), `dictionary_matrix` (D), `mcmc_samples`
+#'     (if store_mcmc = TRUE), `diagnostics`, `convergence`, and `seed`
+#'   - `best_chain`: Index of the chain with the highest MAP log posterior
+#'   - `parameters`: MCMC settings used
 #'   - `model_info`: Model specification
+#'
+#'   The object holds no estimates of its own. Reach a chain's estimates with
+#'   [get_chain()], which defaults to the best chain, or with
+#'   [extract_allocations()] / [extract_strains()]; every diagnostic function
+#'   also takes a `chain` argument. [compare_chains()] summarises all chains.
 #'
 #' @importFrom stats runif dpois dbinom dnbinom rbeta acf median
 #' @importFrom utils read.delim tail
@@ -66,6 +78,8 @@ snp_slice <- function(data,
                       rho = if (model == "categorical") 0.5 else NULL,
                       threshold = 0.001,
                       gap = NULL,
+                      n_chains = 1,
+                      n_cores = 1,
                       seed = NULL,
                       verbose = TRUE,
                       log_performance = FALSE,
@@ -79,7 +93,7 @@ snp_slice <- function(data,
 
   # Validate inputs
   validate_parameters(alpha, rho, threshold)
-  validate_mcmc_settings(n_sample, n_burnin, gap)
+  validate_mcmc_settings(n_sample, n_burnin, gap, n_chains, n_cores)
 
   # Set default burn-in if not provided
   if (is.null(n_burnin)) {
@@ -99,16 +113,19 @@ snp_slice <- function(data,
   if (verbose) {
     cat("Running SNP-Slice with", model, "model\n")
     cat("N =", nrow(processed_data$y), "hosts, P =", ncol(processed_data$y), "SNPs\n")
-    cat("Retained samples:", n_sample, "burn-in:", n_burnin, "\n")
+    cat("Retained samples:", n_sample, "burn-in:", n_burnin,
+        "chains:", n_chains, "\n")
   }
 
-  result <- run_mcmc(
+  result <- run_chains(
     model_obj = model_obj,
     n_sample = n_sample,
     n_burnin = n_burnin,
     gap = gap,
     verbose = verbose,
-    store_mcmc = store_mcmc
+    store_mcmc = store_mcmc,
+    n_chains = as.integer(n_chains),
+    n_cores = as.integer(n_cores)
   )
 
   # Create results object
@@ -117,7 +134,9 @@ snp_slice <- function(data,
   if (verbose) {
     cat("Analysis complete\n")
     if (log_performance) {
-      print_performance_summary()
+      # Chains may have run in separate processes, so use the timings the best
+      # chain returned rather than this process's global log
+      print_performance_summary(result$performance)
     }
   }
 

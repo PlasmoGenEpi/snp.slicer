@@ -11,7 +11,8 @@ calculate_allele_frequencies(
   n_samples = 100,
   interval = 0.95,
   allele_sep = "|",
-  additional_burnin = 0
+  additional_burnin = 0,
+  chain = NULL
 )
 }
 \arguments{
@@ -30,6 +31,11 @@ calculate_allele_frequencies(
 \item{additional_burnin}{Number of additional stored samples to discard from
 the start of the retained chain. The retained chain is already
 post-burn-in, so this defaults to 0.}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 The structure depends on \code{use_map}. \describe{
@@ -57,7 +63,7 @@ allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 print(allele_freqs)
 
 # With MCMC: posterior mean, SD, credible interval, and per-sample mean count
-if (!is.null(result$mcmc_samples)) {
+if (!is.null(get_chain(result)$mcmc_samples)) {
   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
   print(allele_freqs_mcmc)
 }

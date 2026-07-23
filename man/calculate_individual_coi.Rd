@@ -9,7 +9,8 @@ calculate_individual_coi(
   use_map = TRUE,
   n_samples = 100,
   interval = 0.95,
-  additional_burnin = 0
+  additional_burnin = 0,
+  chain = NULL
 )
 }
 \arguments{
@@ -27,6 +28,11 @@ are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.}
 \item{additional_burnin}{Number of additional stored samples to discard from
 the start of the retained chain. The retained chain is already
 post-burn-in, so this defaults to 0.}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 A data frame with one row per host: host_index, host_id, coi_estimate,
@@ -42,7 +48,7 @@ posterior mean, SD, and credible interval are computed.
 result <- load_example_results()
 coi_map <- calculate_individual_coi(result, use_map = TRUE)
 head(coi_map)
-if (!is.null(result$mcmc_samples)) {
+if (!is.null(get_chain(result)$mcmc_samples)) {
   coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50)
   head(coi_post)
 }

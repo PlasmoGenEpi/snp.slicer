@@ -8,7 +8,8 @@ effective_sample_size(
   results,
   parameter = "logpost",
   method = "autocorrelation",
-  additional_burnin = 0
+  additional_burnin = 0,
+  chain = NULL
 )
 }
 \arguments{
@@ -36,6 +37,11 @@ effective_sample_size(
 \item{additional_burnin}{Number of additional stored samples to discard from
 the start of the retained chain. The retained chain is already
 post-burn-in, so this defaults to 0.}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 Effective sample size(s) and diagnostic information

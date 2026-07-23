@@ -4,7 +4,7 @@
 \alias{validate_mcmc_settings}
 \title{Validate MCMC settings}
 \usage{
-validate_mcmc_settings(n_sample, n_burnin, gap)
+validate_mcmc_settings(n_sample, n_burnin, gap, n_chains = 1, n_cores = 1)
 }
 \arguments{
 \item{n_sample}{Number of post-burn-in iterations to retain}
