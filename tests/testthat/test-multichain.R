@@ -65,7 +65,7 @@ test_that("get_chain returns a usable single-chain results object", {
   # Downstream diagnostics work unchanged on a single chain
   coi <- calculate_individual_coi(chain2, use_map = FALSE, n_samples = 5)
   expect_equal(nrow(coi), nrow(chain2$allocation_matrix))
-  expect_true(is.numeric(effective_sample_size(chain2, "logpost")$ess))
+  expect_true(is.data.frame(convergence_diagnostics(chain2, pars = "logpost")))
 
   # Default is the best chain
   expect_identical(get_chain(result)$allocation_matrix,
@@ -91,15 +91,8 @@ test_that("diagnostics take a chain argument, defaulting to the best chain", {
   coi <- calculate_individual_coi(result, chain = other)
   expect_equal(coi$coi_estimate, unname(rowSums(result$chains[[other]]$allocation_matrix)))
 
-  ess_best <- effective_sample_size(result, "logpost")
-  ess_other <- effective_sample_size(result, "logpost", chain = other)
-  expect_equal(ess_best$n_samples, ess_other$n_samples)
-  expect_false(isTRUE(all.equal(ess_best$ess, ess_other$ess)))
-
   freqs <- calculate_allele_frequencies(result, c(1, 2), chain = other)
   expect_true(all(freqs$frequency >= 0))
-
-  expect_error(effective_sample_size(result, chain = 99), "chain must be an integer")
 })
 
 test_that("verbose multi-chain runs report progress without error", {

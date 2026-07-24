@@ -51,7 +51,7 @@ read0 <- example_snp_data$read0
 read1 <- example_snp_data$read1
 cat("Data dimensions:", nrow(read0), "hosts ×", ncol(read0), "SNPs\n")
 
-# Pre-computed results (negative binomial model, 2000 MCMC iterations)
+# Pre-computed results (negative binomial model, 3 chains)
 result <- load_example_results()
 cat("Pre-computed results loaded successfully!\n")
 
@@ -164,15 +164,13 @@ result_tuned <- snp_slice(data,
 
 ## Convergence diagnostics
 
-When you store MCMC samples (`store_mcmc = TRUE`), you can assess convergence with effective sample size (ESS) and trace plots:
+When you store MCMC samples (`store_mcmc = TRUE`), `convergence_diagnostics()` reports R-hat and effective sample size (ESS), pooled across all chains, for permutation-invariant summaries of the run. R-hat is most informative with several chains (run `snp_slice(..., n_chains = 3)`), but a single chain still yields a split-R-hat.
 
 ```{r, fig.alt = "Trace plot of log posterior over MCMC iterations."}
 if (!is.null(get_chain(result)$mcmc_samples)) {
-  # Effective sample size for log posterior
-  ess_logpost <- effective_sample_size(result, parameter = "logpost")
-  ess_val <- if (is.numeric(ess_logpost)) ess_logpost else ess_logpost$ess
-  cat("Effective sample size (log posterior):", round(ess_val, 1), "\n")
-  
+  # R-hat and ESS for the whole run, one row per parameter
+  print(convergence_diagnostics(result))
+
   # Trace plot of log posterior
   plot_convergence(result, type = "logpost")
 } else {
@@ -180,7 +178,11 @@ if (!is.null(get_chain(result)$mcmc_samples)) {
 }
 ```
 
-You can also use `plot_convergence(result, type = "kstar")` for the number of active strains or `type = "n_strains"` for strain count over iterations. See `?effective_sample_size` and `?plot_convergence` for options.
+Constant parameters (e.g. `kstar`/`ktrunc` when the dictionary size has settled) have zero variance, for which `posterior` returns `NaN` — meaning "this parameter did not move", not a failure.
+
+Use `pars = "coi"` for per-host complexity of infection, which is invariant to strain relabeling; element-wise diagnostics on the `A`/`D` matrices are intentionally not provided because strain labels are not identifiable.
+
+`as_draws_snp_slice()` returns the underlying `posterior::draws_array` if you want to apply other `posterior` functions directly. See `?convergence_diagnostics` and `?plot_convergence` for options.
 
 ## Visualizing results
 
@@ -349,7 +351,7 @@ knitr::kable(summary_stats,
 This vignette covered the basics of using SNP-Slice with the negative binomial model. For more:
 
 - **Other models**: Try Poisson, binomial, or categorical models via the `model` argument in `snp_slice()`.
-- **Diagnostics**: Use `?effective_sample_size` and `?plot_convergence` when MCMC samples are stored.
+- **Diagnostics**: Use `?convergence_diagnostics` (R-hat and ESS) and `?plot_convergence` when MCMC samples are stored.
 - **Your data**: Apply SNP-Slice to your own read count or categorical data; see `?snp_slice` and `?load_example_results` for input format and examples.
 - **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `n_burnin`, and `gap` for your application.
 

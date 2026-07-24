@@ -47,19 +47,19 @@ test_that("MCMC consumers agree on the sample pool they use", {
   freqs <- calculate_allele_frequencies(result, c(1, 2), use_map = FALSE, n_samples = 20)
   expect_equal(unique(freqs$n_samples), 20)
 
-  ess <- effective_sample_size(result, "logpost")
-  expect_equal(ess$n_samples, 20)
+  draws <- as_draws_snp_slice(result, "logpost")
+  expect_equal(posterior::niterations(draws), 20)
 })
 
 test_that("additional_burnin trims the retained chain further", {
   result <- snp_slice(make_burnin_data(), n_sample = 20, n_burnin = 10,
                       store_mcmc = TRUE, verbose = FALSE)
 
-  ess <- effective_sample_size(result, "logpost", additional_burnin = 15)
-  expect_equal(ess$n_samples, 5)
+  draws <- as_draws_snp_slice(result, "logpost", additional_burnin = 15)
+  expect_equal(posterior::niterations(draws), 5)
 
   expect_error(
-    effective_sample_size(result, "logpost", additional_burnin = 20),
+    as_draws_snp_slice(result, "logpost", additional_burnin = 20),
     "additional_burnin"
   )
 })

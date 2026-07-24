@@ -17,8 +17,9 @@ run_chains(..., n_chains = 1L, n_cores = 1L, verbose = TRUE)
 function reports on the chain set as a whole as well as passing it down.}
 }
 \value{
-List with \code{chains} (per-chain results), \code{best_chain}, and
-the best chain's fields promoted to the top level
+List with \code{chains} (per-chain results) and \code{best_chain}.
+\code{create_results_object()} keeps those two and the shared
+\code{parameters}; nothing else is carried through to the results object.
 }
 \description{
 Orchestrates \code{\link{run_chain}}: draws per-chain seeds, dispatches the

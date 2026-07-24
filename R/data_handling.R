@@ -603,8 +603,9 @@ map_estimates <- function(map_state) {
 #' Load Example Analysis Results
 #'
 #' Loads pre-computed SNP-Slice analysis results from the example data.
-#' These results were generated using the negative binomial model with 1000
-#' burn-in iterations followed by 1000 retained samples.
+#' These results were generated using the negative binomial model with 3 chains,
+#' each with 1000 burn-in iterations followed by 250 retained samples, so that
+#' \code{\link{convergence_diagnostics}} can report between-chain R-hat and ESS.
 #'
 #' @return A \code{snp_slice_results} object containing the analysis results
 #' @export
@@ -623,12 +624,14 @@ load_example_results <- function() {
     example_data <- example_snp_data
     data <- list(read0 = example_data$read0, read1 = example_data$read1)
     
-    # Run analysis
-    set.seed(123)
+    # Run analysis (mirrors scripts/run_example_analysis.R)
     result <- snp_slice(data,
                        model = "negative_binomial",
-                       n_sample = 1000,
+                       n_sample = 250,
                        n_burnin = 1000,
+                       n_chains = 3,
+                       n_cores = 3,
+                       seed = 123,
                        store_mcmc = TRUE,
                        verbose = FALSE)
     

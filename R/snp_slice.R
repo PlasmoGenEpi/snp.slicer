@@ -51,7 +51,7 @@
 #'   [extract_allocations()] / [extract_strains()]; every diagnostic function
 #'   also takes a `chain` argument. [compare_chains()] summarises all chains.
 #'
-#' @importFrom stats runif dpois dbinom dnbinom rbeta acf median
+#' @importFrom stats runif dpois dbinom dnbinom rbeta median
 #' @importFrom utils read.delim tail
 #'
 #' @examples

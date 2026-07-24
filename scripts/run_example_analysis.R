@@ -29,8 +29,10 @@ cat("This may take a few minutes...\n")
 
 result <- snp_slice(data,
                    model = "negative_binomial",
-                   n_sample = 1000,
+                   n_sample = 250,
                    n_burnin = 1000,
+                   n_chains = 3,       # Multiple chains for R-hat / ESS diagnostics
+                   n_cores = 3,        # Run the chains in parallel
                    seed = 123,  # For reproducibility
                    store_mcmc = TRUE,
                    verbose = TRUE)
