@@ -1,7 +1,7 @@
 Package: snp.slicer
 Title: Bayesian Nonparametric Resolution of Multi-Strain Infections
 Version: 0.1.0
-Author: Nianqiao Ju [aut], Maxwell Murphy [cre]
+Author: Nianqiao Ju [aut], Maxwell Murphy [cre], Alfred Hubbard [aut]
 Maintainer: Maxwell Murphy <maxwell.murphy@ucsf.edu>
 Authors@R: 
     person(
@@ -16,6 +16,13 @@ Authors@R:
         email = "maxwell.murphy@ucsf.edu",
         comment = c(ORCID = "0000-0003-0332-4388"), 
         role = c("cre")
+    )
+    person(
+        given = "Alfred", 
+        family = "Hubbard", 
+        email = "ahubba19@jh.edu",
+        comment = c(ORCID = "0000-0003-4917-7272"), 
+        role = c("aut")
     )
 Description: Implementation of SNP-Slice, a Bayesian nonparametric method for resolving multi-strain infections using slice sampling with stick-breaking construction. The algorithm simultaneously estimates strain haplotypes and links them to hosts from sequencing data. Supports multiple observation models including categorical, Poisson, binomial, and negative binomial distributions.
 License: GPL-3 + file LICENSE
