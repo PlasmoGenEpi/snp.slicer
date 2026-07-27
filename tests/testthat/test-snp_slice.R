@@ -10,13 +10,13 @@ test_that("snp_slice basic functionality works", {
   
   # Check result structure
   expect_s3_class(result, "snp_slice_results")
-  expect_true(is.matrix(get_chain(result)$allocation_matrix))
-  expect_true(is.matrix(get_chain(result)$dictionary_matrix))
+  expect_true(is.matrix(get_chain(result)$map_allocation_matrix))
+  expect_true(is.matrix(get_chain(result)$map_dictionary_matrix))
   expect_true(is.list(result$model_info))
   
   # Check dimensions
-  expect_equal(nrow(get_chain(result)$allocation_matrix), 2)  # 2 hosts
-  expect_equal(ncol(get_chain(result)$dictionary_matrix), 2)  # 4 SNPs
+  expect_equal(nrow(get_chain(result)$map_allocation_matrix), 2)  # 2 hosts
+  expect_equal(ncol(get_chain(result)$map_dictionary_matrix), 2)  # 4 SNPs
 })
 
 test_that("snp_slice validates input data", {
@@ -138,7 +138,7 @@ test_that("snp_slice handles MCMC parameters correctly", {
   # Test with seed
   result1 <- snp_slice(test_data, n_sample = 25, seed = 123, verbose = FALSE)
   result2 <- snp_slice(test_data, n_sample = 25, seed = 123, verbose = FALSE)
-  expect_equal(get_chain(result1)$allocation_matrix, get_chain(result2)$allocation_matrix)
+  expect_equal(get_chain(result1)$map_allocation_matrix, get_chain(result2)$map_allocation_matrix)
 })
 
 test_that("snp_slice stores MCMC samples when requested", {

@@ -40,8 +40,10 @@
 #'
 #' @return An object of class `snp_slice_results` containing:
 #'   - `chains`: Per-chain results, all stored the same way. Each holds that
-#'     chain's `allocation_matrix` (A), `dictionary_matrix` (D), `mcmc_samples`
-#'     (if store_mcmc = TRUE), `diagnostics`, `convergence`, and `seed`
+#'     chain's MAP estimate (`map_allocation_matrix` (A), `map_dictionary_matrix`
+#'     (D)) and final-sample estimate (`final_allocation_matrix`,
+#'     `final_dictionary_matrix`), plus `mcmc_samples` (if store_mcmc = TRUE),
+#'     `diagnostics`, `convergence`, and `seed`
 #'   - `best_chain`: Index of the chain with the highest MAP log posterior
 #'   - `parameters`: MCMC settings used
 #'   - `model_info`: Model specification

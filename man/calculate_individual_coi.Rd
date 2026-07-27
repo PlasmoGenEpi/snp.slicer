@@ -6,7 +6,7 @@
 \usage{
 calculate_individual_coi(
   results,
-  use_map = TRUE,
+  estimate = c("final_sample", "map", "posterior"),
   n_samples = 100,
   interval = 0.95,
   additional_burnin = 0,
@@ -16,14 +16,18 @@ calculate_individual_coi(
 \arguments{
 \item{results}{A \code{snp_slice_results} object.}
 
-\item{use_map}{If \code{TRUE} (default), use MAP only; uncertainty columns
-are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.}
+\item{estimate}{Which estimate to report. One of \code{"final_sample"} (the
+final sample of the chain, matching the SNP-Slice paper; the default),
+\code{"map"} (the maximum a posteriori state), or \code{"posterior"}
+(posterior mean, SD, and credible interval over retained MCMC samples).
+\code{"final_sample"} and \code{"map"} are point estimates; only
+\code{"posterior"} needs \code{store_mcmc = TRUE}.}
 
-\item{n_samples}{When \code{use_map = FALSE}, number of MCMC samples to use
-(capped at the number of retained samples).}
+\item{n_samples}{Number of MCMC samples to use when
+\code{estimate = "posterior"} (default: 100)}
 
-\item{interval}{Numeric in (0, 1). Credible interval width when using MCMC
-(e.g. 0.95 for 2.5 and 97.5 percent quantiles).}
+\item{interval}{Numeric in (0, 1). Credible interval width when
+\code{estimate = "posterior"} (e.g. 0.95).}
 
 \item{additional_burnin}{Number of additional stored samples to discard from
 the start of the retained chain. The retained chain is already
@@ -36,20 +40,21 @@ chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
 A data frame with one row per host: host_index, host_id, coi_estimate,
-coi_sd, coi_lower, coi_upper. Uncertainty columns are NA when using MAP or
-when no MCMC samples are available.
+coi_sd, coi_lower, coi_upper. Uncertainty columns are NA for a point
+estimate or when no MCMC samples are available.
 }
 \description{
-Returns per-host complexity of infection (COI). With \code{use_map = TRUE}
-you get a point estimate (MAP); with \code{use_map = FALSE} and MCMC samples,
-posterior mean, SD, and credible interval are computed.
+Returns per-host complexity of infection (COI). A point estimate
+(\code{estimate = "final_sample"} or \code{"map"}) gives one COI per host with
+\code{NA} uncertainty columns; \code{estimate = "posterior"} computes
+posterior mean, SD, and credible interval from the MCMC samples.
 }
 \examples{
 result <- load_example_results()
-coi_map <- calculate_individual_coi(result, use_map = TRUE)
-head(coi_map)
+coi_final <- calculate_individual_coi(result, estimate = "final_sample")
+head(coi_final)
 if (!is.null(get_chain(result)$mcmc_samples)) {
-  coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50)
+  coi_post <- calculate_individual_coi(result, estimate = "posterior", n_samples = 50)
   head(coi_post)
 }
 }

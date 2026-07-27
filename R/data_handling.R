@@ -555,12 +555,15 @@ read_snp_data <- function(file_path, format = "auto") {
 create_results_object <- function(mcmc_result, model_obj, processed_data) {
 
   chains <- lapply(mcmc_result$chains, function(chain) {
-    chain_maps <- map_estimates(chain$map_state)
+    chain_maps <- active_state_matrices(chain$map_state)
+    chain_finals <- active_state_matrices(chain$final_state)
     list(
       chain_id = chain$chain_id,
       seed = chain$seed,
-      allocation_matrix = chain_maps$allocation_matrix,
-      dictionary_matrix = chain_maps$dictionary_matrix,
+      map_allocation_matrix = chain_maps$allocation_matrix,
+      map_dictionary_matrix = chain_maps$dictionary_matrix,
+      final_allocation_matrix = chain_finals$allocation_matrix,
+      final_dictionary_matrix = chain_finals$dictionary_matrix,
       mcmc_samples = chain$samples,
       diagnostics = chain$diagnostics,
       convergence = chain$convergence,
@@ -585,19 +588,47 @@ create_results_object <- function(mcmc_result, model_obj, processed_data) {
   return(results)
 }
 
-#' Extract MAP allocation and dictionary matrices from a chain state
+#' Extract allocation and dictionary matrices from a chain state
 #'
-#' @param map_state MAP state of a chain
+#' @param state A chain state (e.g. the MAP state or the final sample),
+#'   carrying full \code{A} and \code{D} matrices
 #'
 #' @return List with \code{allocation_matrix} and \code{dictionary_matrix},
 #'   restricted to strains with at least one host
 #' @keywords internal
-map_estimates <- function(map_state) {
-  active_strains <- colSums(map_state$A) > 0
+active_state_matrices <- function(state) {
+  active_strains <- colSums(state$A) > 0
   list(
-    allocation_matrix = map_state$A[, active_strains, drop = FALSE],
-    dictionary_matrix = map_state$D[active_strains, , drop = FALSE]
+    allocation_matrix = state$A[, active_strains, drop = FALSE],
+    dictionary_matrix = state$D[active_strains, , drop = FALSE]
   )
+}
+
+#' Access the allocation and dictionary matrices for a point estimate
+#'
+#' Selects the matrices backing a point estimate, either the MAP or the 
+#' final sample of the chain.
+#'
+#' @param results A single-chain \code{snp_slice_results} object (as returned by
+#'   \code{\link{get_chain}}).
+#' @param estimate Either \code{"final_sample"} or \code{"map"}.
+#'
+#' @return List with \code{A} (allocation matrix) and \code{D} (dictionary
+#'   matrix).
+#' @keywords internal
+point_estimate_matrices <- function(results, estimate) {
+  if (estimate == "final_sample") {
+    if (is.null(results$final_allocation_matrix)) {
+      stop("Final-sample estimate unavailable; re-run snp_slice() to ",
+           "produce results that carry the final sample.", call. = FALSE)
+    }
+    list(A = results$final_allocation_matrix,
+         D = results$final_dictionary_matrix)
+  } else if (estimate == "map") {
+    list(A = results$map_allocation_matrix, D = results$map_dictionary_matrix)
+  } else {
+    stop('Please specify either "map" or "final_sample" for estimate')
+  }
 }
 
 #' Load Example Analysis Results
@@ -680,9 +711,16 @@ load_example_results <- function() {
 #'
 #' @param results A \code{snp_slice_results} object containing MCMC results
 #' @param snp_indices A vector of SNP indices to treat as a single allele
-#' @param use_map Logical, whether to use MAP estimates (TRUE) or sample from MCMC (FALSE)
-#' @param n_samples Number of MCMC samples to use if use_map = FALSE (default: 100)
-#' @param interval Numeric in (0, 1). Credible interval width when using MCMC (e.g. 0.95).
+#' @param estimate Which estimate to report. One of \code{"final_sample"} (the
+#'   final sample of the chain, matching the SNP-Slice paper; the default),
+#'   \code{"map"} (the maximum a posteriori state), or \code{"posterior"}
+#'   (posterior mean, SD, and credible interval over retained MCMC samples).
+#'   \code{"final_sample"} and \code{"map"} are point estimates; only
+#'   \code{"posterior"} needs \code{store_mcmc = TRUE}.
+#' @param n_samples Number of MCMC samples to use when
+#'   \code{estimate = "posterior"} (default: 100)
+#' @param interval Numeric in (0, 1). Credible interval width when
+#'   \code{estimate = "posterior"} (e.g. 0.95).
 #' @param allele_sep Separator for allele strings (default: "|")
 #' @param additional_burnin Number of additional stored samples to discard from
 #'   the start of the retained chain. The retained chain is already
@@ -692,12 +730,12 @@ load_example_results <- function() {
 #'   posterior (\code{results$best_chain}). Give an index to analyse a specific
 #'   chain instead; see \code{\link{compare_chains}}.
 #'
-#' @return The structure depends on \code{use_map}. \describe{
-#'   \item{MAP (\code{use_map = TRUE})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele in the MAP allocation), \code{total_parasites} (total parasites in the MAP allocation; same for every row).}
-#'   \item{MCMC (\code{use_map = FALSE})}{Data frame with columns: \code{allele}, \code{frequency} (posterior mean proportion), \code{frequency_sd} (posterior SD of proportion across samples), \code{frequency_lower} and \code{frequency_upper} (credible interval, e.g. 2.5\% and 97.5\%), \code{mean_count} (mean parasites with this allele per MCMC sample; does not scale with \code{n_samples}), \code{n_samples}. Attribute \code{mean_total_parasites}: mean total parasites per MCMC sample (same for all alleles).}
+#' @return The structure depends on \code{estimate}. \describe{
+#'   \item{Point estimate (\code{"final_sample"} or \code{"map"})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele), \code{total_parasites} (total parasites; same for every row).}
+#'   \item{Posterior (\code{"posterior"})}{Data frame with columns: \code{allele}, \code{frequency} (posterior mean proportion), \code{frequency_sd} (posterior SD of proportion across samples), \code{frequency_lower} and \code{frequency_upper} (credible interval, e.g. 2.5% and 97.5%), \code{mean_count} (mean parasites with this allele per MCMC sample; does not scale with \code{n_samples}), \code{n_samples}. Attribute \code{mean_total_parasites}: mean total parasites per MCMC sample (same for all alleles).}
 #' }
 #'
-#' @details With \code{use_map = FALSE}, counts are summarized as per-sample means rather than sums,
+#' @details With \code{estimate = "posterior"}, counts are summarized as per-sample means rather than sums,
 #'   so \code{mean_count} and \code{mean_total_parasites} are interpretable regardless of \code{n_samples}.
 #'   Frequency uncertainty (\code{frequency_sd}, \code{frequency_lower}, \code{frequency_upper}) is
 #'   computed from the distribution of allele frequencies across MCMC samples.
@@ -706,17 +744,18 @@ load_example_results <- function() {
 #' @examples
 #' # Load example results
 #' result <- load_example_results()
-#' 
-#' # Calculate allele frequencies for SNPs 1, 5, and 10 (MAP)
+#'
+#' # Calculate allele frequencies for SNPs 1, 5, and 10 (final sample)
 #' allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 #' print(allele_freqs)
 #'
-#' # With MCMC: posterior mean, SD, credible interval, and per-sample mean count
+#' # Posterior: mean, SD, credible interval, and per-sample mean count
 #' if (!is.null(get_chain(result)$mcmc_samples)) {
-#'   allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
-#'   print(allele_freqs_mcmc)
+#'   allele_freqs_post <- calculate_allele_frequencies(result, c(1, 5, 10), estimate = "posterior", n_samples = 50)
+#'   print(allele_freqs_post)
 #' }
-calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n_samples = 100, interval = 0.95, allele_sep = "|", additional_burnin = 0, chain = NULL) {
+calculate_allele_frequencies <- function(results, snp_indices, estimate = c("final_sample", "map", "posterior"), n_samples = 100, interval = 0.95, allele_sep = "|", additional_burnin = 0, chain = NULL) {
+  estimate <- match.arg(estimate)
   if (length(unique(snp_indices)) != length(snp_indices)) {
     stop("snp_indices must be unique")
   }
@@ -742,12 +781,8 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
     stop("snp_indices must be a non-empty vector")
   }
   
-  if (any(snp_indices < 1) || any(snp_indices > ncol(results$dictionary_matrix))) {
-    stop("snp_indices must be valid SNP positions (1 to ", ncol(results$dictionary_matrix), ")")
-  }
-  
-  if (!is.logical(use_map) || length(use_map) != 1) {
-    stop("use_map must be a single logical value")
+  if (any(snp_indices < 1) || any(snp_indices > ncol(results$map_dictionary_matrix))) {
+    stop("snp_indices must be valid SNP positions (1 to ", ncol(results$map_dictionary_matrix), ")")
   }
   
   if (!is.numeric(n_samples) || n_samples < 1) {
@@ -757,14 +792,15 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
   if (!is.numeric(interval) || interval <= 0 || interval >= 1) {
     stop("interval must be a number between 0 and 1 (exclusive)")
   }
-  
-  r0_values <- results$model_info$processed_data$r0_values[snp_indices]
-  r1_values <- results$model_info$processed_data$r1_values[snp_indices] 
 
-  if (use_map) {
-    # Use MAP estimates: single allocation, return count and total_parasites
-    A <- results$allocation_matrix
-    D <- results$dictionary_matrix
+  r0_values <- results$model_info$processed_data$r0_values[snp_indices]
+  r1_values <- results$model_info$processed_data$r1_values[snp_indices]
+
+  if (estimate != "posterior") {
+    # Point estimate (MAP or final sample): single iteration, return count and total_parasites
+    matrices <- point_estimate_matrices(results, estimate)
+    A <- matrices$A
+    D <- matrices$D
     allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep)
     total_parasites <- sum(allele_counts$count)
     result_df <- data.frame(
@@ -775,9 +811,9 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
       stringsAsFactors = FALSE
     )
   } else {
-    # MCMC: per-sample frequencies and counts, then summarize (sample-size invariant)
+    # Posterior: per-sample frequencies and counts, then summarize (sample-size invariant)
     if (is.null(results$mcmc_samples)) {
-      stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
+      stop("MCMC samples not available. Use estimate = \"map\" or \"final_sample\", or run snp_slice with store_mcmc = TRUE")
     }
     samples <- retained_samples(results, additional_burnin)
     n_total_samples <- length(samples)
@@ -799,9 +835,10 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 
 #' Calculate allele frequencies for multiple target sets
 #'
-#' For each target set, computes allele frequencies from MCMC/MAP results and
-#' returns a list of frequency tables (one per set). Each set is a vector of
-#' target indices or target names.
+#' For each target set, computes allele frequencies and returns a list of
+#' frequency tables (one per set). Each set is a vector of target indices or
+#' target names. The estimator is chosen by the \code{estimate} argument passed
+#' through \code{...} to \code{\link{calculate_allele_frequencies}}.
 #'
 #' @param results A \code{snp_slice_results} object containing MCMC results.
 #' @param target_sets List of vectors; each element is target indices (integer)
@@ -812,8 +849,9 @@ calculate_allele_frequencies <- function(results, snp_indices, use_map = TRUE, n
 #' @return A named list of data frames, one per target set. List names come from
 #'   \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc. Each data frame
 #'   has the same structure as the return value of \code{\link{calculate_allele_frequencies}}:
-#'   with MAP, columns \code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
-#'   with MCMC, columns \code{allele}, \code{frequency}, \code{frequency_sd},
+#'   for a point estimate (\code{"final_sample"} or \code{"map"}), columns
+#'   \code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
+#'   for \code{"posterior"}, columns \code{allele}, \code{frequency}, \code{frequency_sd},
 #'   \code{frequency_lower}, \code{frequency_upper}, \code{mean_count}, \code{n_samples},
 #'   and attribute \code{mean_total_parasites}. See that function's help for the meaning
 #'   of each column.

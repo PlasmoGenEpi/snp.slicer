@@ -1,8 +1,8 @@
 test_that("extract_strains works correctly", {
   # Create test result
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3)
   )
   class(test_result) <- "snp_slice_results"
@@ -22,12 +22,12 @@ test_that("extract_strains works correctly", {
 test_that("extract_allocations works correctly", {
   # Create test result
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3)
   )
   class(test_result) <- "snp_slice_results"
-  
+
   # Test extraction
   allocations <- extract_allocations(test_result)
   
@@ -44,16 +44,16 @@ test_that("extract_allocations works correctly", {
   expect_equal(allocations$multiplicity_of_infection, c(2, 1))
 })
 
-test_that("calculate_individual_coi with use_map = TRUE (MAP only)", {
+test_that("calculate_individual_coi with estimate = 'map' (MAP only)", {
   A <- matrix(c(1, 1, 1, 0, 0, 1), nrow = 3, ncol = 2, byrow = TRUE)
   test_result <- list(
-    allocation_matrix = A,
-    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    map_allocation_matrix = A,
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
     model_info = list(processed_data = list(specimen_ids = NULL))
   )
   class(test_result) <- "snp_slice_results"
 
-  coi <- calculate_individual_coi(test_result, use_map = TRUE)
+  coi <- calculate_individual_coi(test_result, estimate = "map")
 
   expect_equal(nrow(coi), 3)
   expect_equal(coi$host_index, 1:3)
@@ -63,11 +63,50 @@ test_that("calculate_individual_coi with use_map = TRUE (MAP only)", {
   expect_true(all(is.na(coi$coi_upper)))
 })
 
-test_that("calculate_individual_coi with MCMC samples (use_map = FALSE)", {
+test_that("calculate_individual_coi with estimate = 'final_sample' uses the final matrices", {
+  A_map <- matrix(c(1, 1, 1, 0, 0, 1), nrow = 3, ncol = 2, byrow = TRUE)
+  A_final <- matrix(c(1, 0, 1, 1, 0, 1), nrow = 3, ncol = 2, byrow = TRUE)
+  test_result <- list(
+    map_allocation_matrix = A_map,
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    final_allocation_matrix = A_final,
+    final_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL))
+  )
+  class(test_result) <- "snp_slice_results"
+
+  coi_final <- calculate_individual_coi(test_result, estimate = "final_sample")
+  coi_map <- calculate_individual_coi(test_result, estimate = "map")
+
+  # final sample is the default
+  expect_equal(coi_final, calculate_individual_coi(test_result))
+  # same column shape as MAP
+  expect_equal(names(coi_final), names(coi_map))
+  # COI comes from the final allocation, not the MAP allocation
+  expect_equal(coi_final$coi_estimate, rowSums(A_final))
+  expect_false(isTRUE(all.equal(coi_final$coi_estimate, coi_map$coi_estimate)))
+  expect_true(all(is.na(coi_final$coi_sd)))
+})
+
+test_that("calculate_individual_coi errors on final_sample when final matrices are absent", {
+  test_result <- list(
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    model_info = list(processed_data = list(specimen_ids = NULL))
+  )
+  class(test_result) <- "snp_slice_results"
+
+  expect_error(
+    calculate_individual_coi(test_result, estimate = "final_sample"),
+    "Final-sample estimate unavailable"
+  )
+})
+
+test_that("calculate_individual_coi with MCMC samples (estimate = 'posterior')", {
   A <- matrix(c(1, 0, 1, 1), nrow = 2, ncol = 2)
   test_result <- list(
-    allocation_matrix = A,
-    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    map_allocation_matrix = A,
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
     model_info = list(processed_data = list(specimen_ids = NULL)),
     mcmc_samples = list(
       list(A = A), list(A = A), list(A = A), list(A = A), list(A = A)
@@ -75,7 +114,7 @@ test_that("calculate_individual_coi with MCMC samples (use_map = FALSE)", {
   )
   class(test_result) <- "snp_slice_results"
 
-  coi <- calculate_individual_coi(test_result, use_map = FALSE, n_samples = 4, interval = 0.95)
+  coi <- calculate_individual_coi(test_result, estimate = "posterior", n_samples = 4, interval = 0.95)
 
   expect_equal(nrow(coi), 2)
   expect_equal(coi$coi_estimate, c(2, 1))
@@ -84,32 +123,31 @@ test_that("calculate_individual_coi with MCMC samples (use_map = FALSE)", {
   expect_equal(coi$coi_upper, c(2, 1))
 })
 
-test_that("calculate_individual_coi errors when use_map = FALSE and no MCMC samples", {
+test_that("calculate_individual_coi errors when estimate = 'posterior' and no MCMC samples", {
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
     model_info = list(processed_data = list(specimen_ids = NULL))
   )
   class(test_result) <- "snp_slice_results"
 
   expect_error(
-    calculate_individual_coi(test_result, use_map = FALSE),
+    calculate_individual_coi(test_result, estimate = "posterior"),
     "MCMC samples not available"
   )
 })
 
 test_that("calculate_individual_coi validates input", {
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(0, nrow = 2, ncol = 2),
     model_info = list(processed_data = list(specimen_ids = NULL))
   )
   class(test_result) <- "snp_slice_results"
 
   expect_error(calculate_individual_coi(list()), "results must be an snp_slice_results object")
-  expect_error(calculate_individual_coi(test_result, use_map = "yes"), "use_map must be a single logical")
-  expect_error(calculate_individual_coi(test_result, n_samples = 0), "n_samples must be a positive integer")
-  expect_error(calculate_individual_coi(test_result, interval = 1), "interval must be a number between 0 and 1")
+  expect_error(calculate_individual_coi(test_result, estimate = "map", n_samples = 0), "n_samples must be a positive integer")
+  expect_error(calculate_individual_coi(test_result, estimate = "map", interval = 1), "interval must be a number between 0 and 1")
 })
 
 test_that("extract functions validate input", {
@@ -121,8 +159,8 @@ test_that("extract functions validate input", {
 test_that("summary.snp_slice_results works", {
   # Create test result
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3, data_type = "read_counts"),
     convergence = list(gap_converged = TRUE, iterations_run = 100),
     diagnostics = list(
@@ -148,8 +186,8 @@ test_that("summary.snp_slice_results works", {
 test_that("print.snp_slice_results works", {
   # Create test result
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3),
     convergence = list(gap_converged = TRUE, iterations_run = 100)
   )
@@ -172,8 +210,8 @@ test_that("plot_convergence validates input", {
   
   # Test with result without MCMC samples
   test_result <- list(
-    allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
-    dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
+    map_allocation_matrix = matrix(c(1, 0, 1, 1), nrow = 2),
+    map_dictionary_matrix = matrix(c(1, 0, 0, 1, 1, 0), nrow = 2, ncol = 3),
     model_info = list(model = "negative_binomial", N = 2, P = 3)
   )
   class(test_result) <- "snp_slice_results"

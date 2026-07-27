@@ -15,8 +15,8 @@ as_draws_snp_slice(
 TRUE}).}
 
 \item{pars}{Character vector of parameters to include. One of \code{"logpost"},
-\code{"n_strains"}, \code{"kstar"}, \code{"ktrunc"} (scalar per sample), or
-\code{"coi"} (per-host complexity of infection, expanding to
+\code{"n_strains"}, \code{"kstar"}, \code{"ktrunc"}, which are all scalar per sample, or
+\code{"coi"} (per-host complexity of infection), which is a vector that expands to
 \code{coi[1]..coi[N]}).}
 
 \item{additional_burnin}{Number of additional stored samples to discard from

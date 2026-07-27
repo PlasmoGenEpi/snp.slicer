@@ -54,9 +54,10 @@ resolve_chain <- function(results, chain = NULL) {
 #' A results object stores every chain identically in \code{results$chains} and
 #' keeps no estimates of its own. This function flattens one chain into a
 #' standalone \code{snp_slice_results} object carrying that chain's
-#' \code{allocation_matrix}, \code{dictionary_matrix}, and \code{mcmc_samples},
-#' which is how the estimates of a run are reached. Diagnostic functions call it
-#' for you via their \code{chain} argument.
+#' \code{map_allocation_matrix}, \code{map_dictionary_matrix},
+#' \code{final_allocation_matrix}, \code{final_dictionary_matrix}, and
+#' \code{mcmc_samples}, which is how the estimates of a run are reached.
+#' Diagnostic functions call it for you via their \code{chain} argument.
 #'
 #' @param results SNP-Slice results object
 #' @param chain Index of the chain to extract (defaults to the best chain)
@@ -67,7 +68,7 @@ resolve_chain <- function(results, chain = NULL) {
 #' result <- load_example_results()
 #' chain1 <- get_chain(result, 1)
 #' summary(chain1)
-#' dim(chain1$allocation_matrix)
+#' dim(chain1$map_allocation_matrix)
 get_chain <- function(results, chain = results$best_chain) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
@@ -94,8 +95,10 @@ get_chain <- function(results, chain = results$best_chain) {
   out <- list(
     chain_id = chain_result$chain_id,
     seed = chain_result$seed,
-    allocation_matrix = chain_result$allocation_matrix,
-    dictionary_matrix = chain_result$dictionary_matrix,
+    map_allocation_matrix = chain_result$map_allocation_matrix,
+    map_dictionary_matrix = chain_result$map_dictionary_matrix,
+    final_allocation_matrix = chain_result$final_allocation_matrix,
+    final_dictionary_matrix = chain_result$final_dictionary_matrix,
     mcmc_samples = chain_result$mcmc_samples,
     diagnostics = chain_result$diagnostics,
     convergence = chain_result$convergence,
@@ -137,7 +140,7 @@ compare_chains <- function(results) {
     map_logpost = vapply(chains, function(x) x$diagnostics$map_logpost, numeric(1)),
     final_logpost = vapply(chains, function(x) x$diagnostics$final_logpost, numeric(1)),
     map_kstar = vapply(chains, function(x) as.integer(x$diagnostics$map_kstar), integer(1)),
-    n_strains = vapply(chains, function(x) nrow(x$dictionary_matrix), integer(1)),
+    n_strains = vapply(chains, function(x) nrow(x$map_dictionary_matrix), integer(1)),
     gap_converged = vapply(chains,
                            function(x) isTRUE(x$convergence$gap_converged), logical(1)),
     best = seq_along(chains) == results$best_chain,
@@ -160,10 +163,10 @@ extract_strains <- function(results, chain = NULL) {
 
   # Extract strain information
   strains <- list(
-    dictionary = results$dictionary_matrix,
-    n_strains = nrow(results$dictionary_matrix),
-    n_snps = ncol(results$dictionary_matrix),
-    strain_names = paste0("Strain_", 1:nrow(results$dictionary_matrix))
+    dictionary = results$map_dictionary_matrix,
+    n_strains = nrow(results$map_dictionary_matrix),
+    n_snps = ncol(results$map_dictionary_matrix),
+    strain_names = paste0("Strain_", 1:nrow(results$map_dictionary_matrix))
   )
   
   return(strains)
@@ -182,16 +185,16 @@ extract_allocations <- function(results, chain = NULL) {
   }
   results <- resolve_chain(results, chain)
 
-  # Extract allocation information
-  n_hosts <- nrow(results$allocation_matrix)
-  n_strains <- ncol(results$allocation_matrix)
+  # Extract allocation information (MAP estimate)
+  n_hosts <- nrow(results$map_allocation_matrix)
+  n_strains <- ncol(results$map_allocation_matrix)
   allocations <- list(
-    allocation_matrix = results$allocation_matrix,
+    allocation_matrix = results$map_allocation_matrix,
     n_hosts = n_hosts,
     n_strains = n_strains,
     host_names = paste0("Host_", seq_len(n_hosts)),
     strain_names = paste0("Strain_", seq_len(n_strains)),
-    multiplicity_of_infection = rowSums(results$allocation_matrix)
+    multiplicity_of_infection = rowSums(results$map_allocation_matrix)
   )
   
   return(allocations)
@@ -200,34 +203,29 @@ extract_allocations <- function(results, chain = NULL) {
 #' Calculate estimated individual COI with uncertainty
 #'
 #' @description
-#' Returns per-host complexity of infection (COI). With \code{use_map = TRUE}
-#' you get a point estimate (MAP); with \code{use_map = FALSE} and MCMC samples,
-#' posterior mean, SD, and credible interval are computed.
+#' Returns per-host complexity of infection (COI). A point estimate
+#' (\code{estimate = "final_sample"} or \code{"map"}) gives one COI per host with
+#' \code{NA} uncertainty columns; \code{estimate = "posterior"} computes
+#' posterior mean, SD, and credible interval from the MCMC samples.
 #'
 #' @param results A \code{snp_slice_results} object.
-#' @param use_map If \code{TRUE} (default), use MAP only; uncertainty columns
-#'   are \code{NA}. If \code{FALSE}, use MCMC samples for mean, SD, and interval.
-#' @param n_samples When \code{use_map = FALSE}, number of MCMC samples to use
-#'   (capped at the number of retained samples).
-#' @param interval Numeric in (0, 1). Credible interval width when using MCMC
-#'   (e.g. 0.95 for 2.5 and 97.5 percent quantiles).
 #' @inheritParams calculate_allele_frequencies
 #'
 #' @return A data frame with one row per host: host_index, host_id, coi_estimate,
-#'   coi_sd, coi_lower, coi_upper. Uncertainty columns are NA when using MAP or
-#'   when no MCMC samples are available.
+#'   coi_sd, coi_lower, coi_upper. Uncertainty columns are NA for a point
+#'   estimate or when no MCMC samples are available.
 #'
 #' @export
 #' @examples
 #' result <- load_example_results()
-#' coi_map <- calculate_individual_coi(result, use_map = TRUE)
-#' head(coi_map)
+#' coi_final <- calculate_individual_coi(result, estimate = "final_sample")
+#' head(coi_final)
 #' if (!is.null(get_chain(result)$mcmc_samples)) {
-#'   coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50)
+#'   coi_post <- calculate_individual_coi(result, estimate = "posterior", n_samples = 50)
 #'   head(coi_post)
 #' }
 calculate_individual_coi <- function(results,
-                                    use_map = TRUE,
+                                    estimate = c("final_sample", "map", "posterior"),
                                     n_samples = 100,
                                     interval = 0.95,
                                     additional_burnin = 0,
@@ -235,10 +233,8 @@ calculate_individual_coi <- function(results,
   if (!inherits(results, "snp_slice_results")) {
     stop("results must be an snp_slice_results object")
   }
+  estimate <- match.arg(estimate)
   results <- resolve_chain(results, chain)
-  if (!is.logical(use_map) || length(use_map) != 1) {
-    stop("use_map must be a single logical value")
-  }
   if (!is.numeric(n_samples) || n_samples < 1) {
     stop("n_samples must be a positive integer")
   }
@@ -246,8 +242,8 @@ calculate_individual_coi <- function(results,
     stop("interval must be a number between 0 and 1 (exclusive)")
   }
 
-  A <- results$allocation_matrix
-  n_hosts <- nrow(A)
+  # Host count is invariant across estimates; use the always-present MAP matrix.
+  n_hosts <- nrow(results$map_allocation_matrix)
 
   host_id <- NA_character_
   if (!is.null(results$model_info$processed_data$specimen_ids)) {
@@ -260,7 +256,8 @@ calculate_individual_coi <- function(results,
     host_id <- rep(NA_character_, n_hosts)
   }
 
-  if (use_map) {
+  if (estimate != "posterior") {
+    A <- point_estimate_matrices(results, estimate)$A
     coi_estimate <- rowSums(A)
     out <- data.frame(
       host_index = seq_len(n_hosts),
@@ -275,7 +272,7 @@ calculate_individual_coi <- function(results,
   }
 
   if (is.null(results$mcmc_samples)) {
-    stop("MCMC samples not available. Set use_map = TRUE or run snp_slice with store_mcmc = TRUE")
+    stop("MCMC samples not available. Use estimate = \"map\" or \"final_sample\", or run snp_slice with store_mcmc = TRUE")
   }
 
   samples <- retained_samples(results, additional_burnin)
@@ -428,11 +425,11 @@ summary.snp_slice_results <- function(object, chain = NULL, ...) {
   
   # Results summary
   cat("Results:\n")
-  cat("- Number of strains identified:", nrow(object$dictionary_matrix), "\n")
-  cat("- Number of hosts:", nrow(object$allocation_matrix), "\n")
-  
+  cat("- Number of strains identified:", nrow(object$map_dictionary_matrix), "\n")
+  cat("- Number of hosts:", nrow(object$map_allocation_matrix), "\n")
+
   # Multiplicity of infection
-  moi <- rowSums(object$allocation_matrix)
+  moi <- rowSums(object$map_allocation_matrix)
   cat("- Multiplicity of infection (MOI):\n")
   cat("  - Mean MOI:", round(mean(moi), 2), "\n")
   cat("  - Median MOI:", round(stats::median(moi), 2), "\n")
@@ -492,8 +489,8 @@ print.snp_slice_results <- function(x, chain = NULL, ...) {
   cat("SNP-Slice Results\n")
   cat("================\n")
   cat("Model:", x$model_info$model, "\n")
-  cat("Dimensions:", nrow(x$allocation_matrix), "hosts x", ncol(x$dictionary_matrix), "strains x", ncol(x$dictionary_matrix), "SNPs\n")
-  cat("Strains identified:", nrow(x$dictionary_matrix), "\n")
+  cat("Dimensions:", nrow(x$map_allocation_matrix), "hosts x", ncol(x$map_dictionary_matrix), "strains x", ncol(x$map_dictionary_matrix), "SNPs\n")
+  cat("Strains identified:", nrow(x$map_dictionary_matrix), "\n")
 
   if (n_chains > 1) {
     cat("Chains:", n_chains, "(best chain:", best_chain, ")\n")

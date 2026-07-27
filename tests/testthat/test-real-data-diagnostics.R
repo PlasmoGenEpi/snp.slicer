@@ -13,12 +13,12 @@ test_that("load_example_results works correctly", {
   expect_true("chains" %in% names(result))
   expect_true("best_chain" %in% names(result))
   expect_true("model_info" %in% names(result))
-  expect_true("allocation_matrix" %in% names(get_chain(result)))
-  expect_true("dictionary_matrix" %in% names(get_chain(result)))
+  expect_true("map_allocation_matrix" %in% names(get_chain(result)))
+  expect_true("map_dictionary_matrix" %in% names(get_chain(result)))
   
   # Check dimensions (should match our example data)
-  expect_equal(nrow(get_chain(result)$allocation_matrix), 200)  # 200 hosts
-  expect_equal(ncol(get_chain(result)$dictionary_matrix), 96)   # 96 SNPs
+  expect_equal(nrow(get_chain(result)$map_allocation_matrix), 200)  # 200 hosts
+  expect_equal(ncol(get_chain(result)$map_dictionary_matrix), 96)   # 96 SNPs
   
   # Check model info (N, P in processed_data)
   expect_equal(result$model_info$model, "negative_binomial")
@@ -146,7 +146,7 @@ test_that("convergence_diagnostics works with real data when MCMC samples are av
 
 test_that("strain diversity analysis works with real data", {
   result <- load_example_results()
-  A <- get_chain(result)$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Calculate strain diversity
   strain_diversity <- rowSums(A > 0)
@@ -171,7 +171,7 @@ test_that("strain diversity analysis works with real data", {
 
 test_that("strain frequency analysis works with real data", {
   result <- load_example_results()
-  A <- get_chain(result)$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Calculate strain frequencies
   strain_frequencies <- colSums(A)
@@ -193,7 +193,7 @@ test_that("strain frequency analysis works with real data", {
 
 test_that("dictionary matrix analysis works with real data", {
   result <- load_example_results()
-  D <- get_chain(result)$dictionary_matrix
+  D <- get_chain(result)$map_dictionary_matrix
   
   # Check basic properties
   expect_true(is.matrix(D))
@@ -214,7 +214,7 @@ test_that("dictionary matrix analysis works with real data", {
 
 test_that("allocation matrix analysis works with real data", {
   result <- load_example_results()
-  A <- get_chain(result)$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Check basic properties
   expect_true(is.matrix(A))
@@ -243,8 +243,8 @@ test_that("model information is consistent", {
   expect_equal(result$model_info$processed_data$P, 96)
   
   # Check consistency with matrices
-  expect_equal(nrow(get_chain(result)$allocation_matrix), result$model_info$processed_data$N)
-  expect_equal(ncol(get_chain(result)$dictionary_matrix), result$model_info$processed_data$P)
+  expect_equal(nrow(get_chain(result)$map_allocation_matrix), result$model_info$processed_data$N)
+  expect_equal(ncol(get_chain(result)$map_dictionary_matrix), result$model_info$processed_data$P)
 })
 
 test_that("convergence information is available", {

@@ -40,11 +40,11 @@ test_that("MCMC consumers agree on the sample pool they use", {
   result <- snp_slice(make_burnin_data(), n_sample = 20, n_burnin = 10,
                       store_mcmc = TRUE, verbose = FALSE)
 
-  coi <- calculate_individual_coi(result, use_map = FALSE, n_samples = 20)
+  coi <- calculate_individual_coi(result, estimate = "posterior", n_samples = 20)
   expect_equal(nrow(coi), 6)
   expect_false(any(is.na(coi$coi_estimate)))
 
-  freqs <- calculate_allele_frequencies(result, c(1, 2), use_map = FALSE, n_samples = 20)
+  freqs <- calculate_allele_frequencies(result, c(1, 2), estimate = "posterior", n_samples = 20)
   expect_equal(unique(freqs$n_samples), 20)
 
   draws <- as_draws_snp_slice(result, "logpost")

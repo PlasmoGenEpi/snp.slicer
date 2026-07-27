@@ -19,16 +19,18 @@ names are used for the returned list.}
 A named list of data frames, one per target set. List names come from
 \code{names(target_sets)} or \code{"set_1"}, \code{"set_2"}, etc. Each data frame
 has the same structure as the return value of \code{\link{calculate_allele_frequencies}}:
-with MAP, columns \code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
-with MCMC, columns \code{allele}, \code{frequency}, \code{frequency_sd},
+for a point estimate (\code{"final_sample"} or \code{"map"}), columns
+\code{allele}, \code{frequency}, \code{count}, \code{total_parasites};
+for \code{"posterior"}, columns \code{allele}, \code{frequency}, \code{frequency_sd},
 \code{frequency_lower}, \code{frequency_upper}, \code{mean_count}, \code{n_samples},
 and attribute \code{mean_total_parasites}. See that function's help for the meaning
 of each column.
 }
 \description{
-For each target set, computes allele frequencies from MCMC/MAP results and
-returns a list of frequency tables (one per set). Each set is a vector of
-target indices or target names.
+For each target set, computes allele frequencies and returns a list of
+frequency tables (one per set). Each set is a vector of target indices or
+target names. The estimator is chosen by the \code{estimate} argument passed
+through \code{...} to \code{\link{calculate_allele_frequencies}}.
 }
 \examples{
 result <- load_example_results()

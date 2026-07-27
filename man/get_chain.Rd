@@ -18,13 +18,14 @@ An \code{snp_slice_results} object for the requested chain
 A results object stores every chain identically in \code{results$chains} and
 keeps no estimates of its own. This function flattens one chain into a
 standalone \code{snp_slice_results} object carrying that chain's
-\code{allocation_matrix}, \code{dictionary_matrix}, and \code{mcmc_samples},
-which is how the estimates of a run are reached. Diagnostic functions call it
-for you via their \code{chain} argument.
+\code{map_allocation_matrix}, \code{map_dictionary_matrix},
+\code{final_allocation_matrix}, \code{final_dictionary_matrix}, and
+\code{mcmc_samples}, which is how the estimates of a run are reached.
+Diagnostic functions call it for you via their \code{chain} argument.
 }
 \examples{
 result <- load_example_results()
 chain1 <- get_chain(result, 1)
 summary(chain1)
-dim(chain1$allocation_matrix)
+dim(chain1$map_allocation_matrix)
 }

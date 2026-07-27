@@ -90,8 +90,10 @@ Only post-burn-in iterations are stored.}
 An object of class \code{snp_slice_results} containing:
 \itemize{
 \item \code{chains}: Per-chain results, all stored the same way. Each holds that
-chain's \code{allocation_matrix} (A), \code{dictionary_matrix} (D), \code{mcmc_samples}
-(if store_mcmc = TRUE), \code{diagnostics}, \code{convergence}, and \code{seed}
+chain's MAP estimate (\code{map_allocation_matrix} (A), \code{map_dictionary_matrix}
+(D)) and final-sample estimate (\code{final_allocation_matrix},
+\code{final_dictionary_matrix}), plus \code{mcmc_samples} (if store_mcmc = TRUE),
+\code{diagnostics}, \code{convergence}, and \code{seed}
 \item \code{best_chain}: Index of the chain with the highest MAP log posterior
 \item \code{parameters}: MCMC settings used
 \item \code{model_info}: Model specification

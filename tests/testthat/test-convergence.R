@@ -49,7 +49,7 @@ test_that("single-chain runs still yield a (split-)R-hat", {
 
 test_that("coi expands to one row/variable per host", {
   result <- run_conv_fixture(n_chains = 2)
-  n_hosts <- nrow(get_chain(result)$allocation_matrix)
+  n_hosts <- nrow(get_chain(result)$map_allocation_matrix)
 
   diag <- convergence_diagnostics(result, pars = "coi")
   expect_equal(nrow(diag), n_hosts)

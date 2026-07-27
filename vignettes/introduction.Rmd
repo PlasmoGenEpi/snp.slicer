@@ -89,17 +89,17 @@ print(D[1:3, 1:8])
 
 ### Posterior allele frequencies
 
-Compute allele (or haplotype) frequencies for specific SNP sets from the MAP or MCMC results. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once. With MAP you get point estimates and literal counts (`allele`, `frequency`, `count`, `total_parasites`). With MCMC you get a posterior mean frequency, SD, credible interval, and per-sample mean count (`mean_count`, `n_samples`), so the table does not depend on how many MCMC samples were used.
+Compute allele (or haplotype) frequencies for specific SNP sets. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once. The `estimate` argument chooses the estimator: `"final_sample"` (the final sample of the chain, matching the SNP-Slice paper; the default) and `"map"` (the maximum a posteriori allocation) are point estimates giving literal counts (`allele`, `frequency`, `count`, `total_parasites`); `"posterior"` gives a posterior mean frequency, SD, credible interval, and per-sample mean count (`mean_count`, `n_samples`), so the table does not depend on how many MCMC samples were used.
 
 ```{r}
-# Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
+# Single target set: allele frequencies for SNPs 1, 5, and 10 (final sample)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 
-# With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
+# Posterior: mean, SD, credible interval, and sample-size-invariant mean_count
 if (!is.null(get_chain(result)$mcmc_samples)) {
-  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
-  head(allele_freqs_mcmc)
+  allele_freqs_post <- calculate_allele_frequencies(result, c(1, 5, 10), estimate = "posterior", n_samples = 50)
+  head(allele_freqs_post)
 }
 
 # Multiple target sets: pass a named list for one table per set
@@ -109,22 +109,22 @@ target_sets <- list(
   locus_c = c(20)
 )
 freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
-# Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
+# Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 ```
 
 ### Individual COI with uncertainty
 
-Per-host complexity of infection (COI) is the number of distinct strains per host. Use `calculate_individual_coi()` for a point estimate (MAP) or, when MCMC samples were stored, posterior mean, SD, and a credible interval.
+Per-host complexity of infection (COI) is the number of distinct strains per host. Use `calculate_individual_coi()` for a point estimate (`estimate = "final_sample"` or `"map"`) or, when MCMC samples were stored, `estimate = "posterior"` for the posterior mean, SD, and a credible interval.
 
 ```{r}
-# Point estimate only (from MAP allocation)
-coi_map <- calculate_individual_coi(result, use_map = TRUE)
-head(coi_map)
+# Point estimate (from the final sample of the chain)
+coi_final <- calculate_individual_coi(result, estimate = "final_sample")
+head(coi_final)
 
 # With posterior uncertainty (requires store_mcmc = TRUE)
 if (!is.null(get_chain(result)$mcmc_samples)) {
-  coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50, interval = 0.95)
+  coi_post <- calculate_individual_coi(result, estimate = "posterior", n_samples = 50, interval = 0.95)
   head(coi_post)
   cat("\nSummary of COI posterior SD:\n")
   print(summary(coi_post$coi_sd))
