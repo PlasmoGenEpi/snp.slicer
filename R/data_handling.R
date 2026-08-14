@@ -761,7 +761,7 @@ calculate_allele_frequencies <- function(results, snp_indices, estimate = c("fin
   }
 
   if (inherits(results, "snp_slice_results")) {
-    results <- resolve_chain(results, chain)
+    results <- get_chain(results, chain)
   }
 
   if (is.character(snp_indices)) {

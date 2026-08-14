@@ -30,24 +30,6 @@ retained_samples <- function(results, additional_burnin = 0) {
   results$mcmc_samples[seq(additional_burnin + 1, n)]
 }
 
-#' Resolve the chain a diagnostic function should use
-#'
-#' Diagnostics take a \code{chain} argument rather than requiring a results
-#' object that holds a single chain. \code{NULL} (the default everywhere) means
-#' the best chain.
-#'
-#' @param results SNP-Slice results object
-#' @param chain Chain index, or \code{NULL} for the best chain
-#'
-#' @return A single-chain results object, as returned by \code{\link{get_chain}}
-#' @keywords internal
-resolve_chain <- function(results, chain = NULL) {
-  if (is.null(chain)) {
-    chain <- results$best_chain
-  }
-  get_chain(results, chain)
-}
-
 #' Extract a single chain as a results object
 #'
 #' @description
@@ -159,7 +141,7 @@ extract_strains <- function(results, chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  results <- resolve_chain(results, chain)
+  results <- get_chain(results, chain)
 
   # Extract strain information
   strains <- list(
@@ -183,7 +165,7 @@ extract_allocations <- function(results, chain = NULL) {
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  results <- resolve_chain(results, chain)
+  results <- get_chain(results, chain)
 
   # Extract allocation information (MAP estimate)
   n_hosts <- nrow(results$map_allocation_matrix)
@@ -234,7 +216,7 @@ calculate_individual_coi <- function(results,
     stop("results must be an snp_slice_results object")
   }
   estimate <- match.arg(estimate)
-  results <- resolve_chain(results, chain)
+  results <- get_chain(results, chain)
   if (!is.numeric(n_samples) || n_samples < 1) {
     stop("n_samples must be a positive integer")
   }
@@ -318,7 +300,7 @@ plot_convergence <- function(results, type = "logpost", additional_burnin = 0, c
   if (!inherits(results, "snp_slice_results")) {
     stop("Input must be an snp_slice_results object")
   }
-  results <- resolve_chain(results, chain)
+  results <- get_chain(results, chain)
 
   if (!type %in% c("logpost", "kstar", "n_strains")) {
     stop("Invalid plot type. Choose from: 'logpost', 'kstar', 'n_strains'")
@@ -408,7 +390,7 @@ summary.snp_slice_results <- function(object, chain = NULL, ...) {
   }
   # Estimates come from one chain; the chain overview needs the whole object
   results <- object
-  object <- resolve_chain(results, chain)
+  object <- get_chain(results, chain)
 
   cat("SNP-Slice Results Summary\n")
   cat("========================\n\n")
@@ -484,7 +466,7 @@ print.snp_slice_results <- function(x, chain = NULL, ...) {
   }
   n_chains <- length(x$chains)
   best_chain <- x$best_chain
-  x <- resolve_chain(x, chain)
+  x <- get_chain(x, chain)
 
   cat("SNP-Slice Results\n")
   cat("================\n")
