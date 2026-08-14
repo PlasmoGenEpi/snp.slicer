@@ -18,7 +18,7 @@ setup_mcmc_kernel(
 Updated model object (same list, with \code{kernel} and cache fields set).
 }
 \description{
-Call before a manual \code{slice_iter()} loop when not using \code{run_mcmc()}.
-\code{run_mcmc()} and \code{snp_slice()} invoke this automatically.
+Call before a manual \code{slice_iter()} loop when not using \code{run_chain()}.
+\code{run_chain()} and \code{snp_slice()} invoke this automatically.
 }
 \keyword{internal}

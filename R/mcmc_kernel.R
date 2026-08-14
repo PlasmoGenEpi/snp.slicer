@@ -156,8 +156,8 @@ restore_matrix_dimnames <- function(updated, template) {
 
 #' Resolve kernel adapter and attach cpp obs cache on \code{model_obj}
 #'
-#' Call before a manual \code{slice_iter()} loop when not using \code{run_mcmc()}.
-#' \code{run_mcmc()} and \code{snp_slice()} invoke this automatically.
+#' Call before a manual \code{slice_iter()} loop when not using \code{run_chain()}.
+#' \code{run_chain()} and \code{snp_slice()} invoke this automatically.
 #'
 #' @param model_obj Model object from \code{create_model()}.
 #' @param backend One of \code{"auto"}, \code{"r"}, or \code{"cpp"}.

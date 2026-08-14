@@ -362,6 +362,6 @@ test_that("snp_slice still runs with compiled kernel when available", {
 
   old_opt <- options(snp.slicer.mcmc_kernel = "cpp")
   on.exit(options(old_opt), add = TRUE)
-  result <- snp_slice(make_count_fixture(), n_mcmc = 25, verbose = FALSE)
+  result <- snp_slice(make_count_fixture(), n_sample = 10, n_burnin = 5, verbose = FALSE)
   expect_s3_class(result, "snp_slice_results")
 })
