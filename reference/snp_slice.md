@@ -11,12 +11,14 @@ hosts from sequencing data.
 snp_slice(
   data,
   model = "negative_binomial",
-  n_mcmc = 10000,
-  burnin = NULL,
+  n_sample = 10000,
+  n_burnin = NULL,
   alpha = 2.6,
   rho = if (model == "categorical") 0.5 else NULL,
   threshold = 0.001,
   gap = NULL,
+  n_chains = 1,
+  n_cores = 1,
   seed = NULL,
   verbose = TRUE,
   log_performance = FALSE,
@@ -51,13 +53,16 @@ snp_slice_negative_binomial(data, ...)
   Observation model to use. Options: "categorical", "poisson",
   "binomial", "negative_binomial" (default).
 
-- n_mcmc:
+- n_sample:
 
-  Number of MCMC iterations (default: 10000).
+  Number of post-burn-in iterations to retain (default: 10000). Burn-in
+  iterations are additional: the chain runs `n_burnin + n_sample`
+  iterations in total and only the last `n_sample` are retained.
 
-- burnin:
+- n_burnin:
 
-  Burn-in period. If NULL, defaults to n_mcmc/2.
+  Number of iterations discarded before sampling begins. If NULL,
+  defaults to `floor(n_sample / 2)`.
 
 - alpha:
 
@@ -74,11 +79,25 @@ snp_slice_negative_binomial(data, ...)
 
 - gap:
 
-  Early stopping threshold. If NULL, runs for full n_mcmc iterations.
+  Early stopping threshold. If NULL, runs for all `n_burnin + n_sample`
+  iterations.
+
+- n_chains:
+
+  Number of independent MCMC chains to run (default: 1). Each chain is
+  seeded separately; the chain reaching the highest MAP log posterior
+  supplies the top-level estimates and all chains are kept in
+  `result$chains`.
+
+- n_cores:
+
+  Number of cores used to run chains simultaneously (default: 1, i.e.
+  chains run sequentially). Capped at `n_chains`.
 
 - seed:
 
-  Random seed for reproducibility.
+  Random seed for reproducibility. Per-chain seeds are based on this
+  seed, so a full multi-chain run is reproducible.
 
 - verbose:
 
@@ -90,7 +109,8 @@ snp_slice_negative_binomial(data, ...)
 
 - store_mcmc:
 
-  Whether to store full MCMC samples (default: FALSE).
+  Whether to store full MCMC samples (default: FALSE). Only post-burn-in
+  iterations are stored.
 
 - ...:
 
@@ -108,17 +128,28 @@ snp_slice_negative_binomial(data, ...)
 
 An object of class `snp_slice_results` containing:
 
-- `allocation_matrix`: Binary allocation matrix (A)
+- `chains`: Per-chain results, all stored the same way. Each holds that
+  chain's MAP estimate (`map_allocation_matrix` (A),
+  `map_dictionary_matrix` (D)) and final-sample estimate
+  (`final_allocation_matrix`, `final_dictionary_matrix`), plus
+  `mcmc_samples` (if store_mcmc = TRUE), `diagnostics`, `convergence`,
+  and `seed`
 
-- `dictionary_matrix`: Binary dictionary matrix (D)
+- `best_chain`: Index of the chain with the highest MAP log posterior
 
-- `mcmc_samples`: MCMC samples (if store_mcmc = TRUE)
-
-- `diagnostics`: Convergence diagnostics
-
-- `parameters`: Model parameters used
+- `parameters`: MCMC settings used
 
 - `model_info`: Model specification
+
+The object holds no estimates of its own. Reach a chain's estimates with
+[`get_chain()`](https://plasmogenepi.github.io/snp.slicer/reference/get_chain.md),
+which defaults to the best chain, or with
+[`extract_allocations()`](https://plasmogenepi.github.io/snp.slicer/reference/extract_allocations.md)
+/
+[`extract_strains()`](https://plasmogenepi.github.io/snp.slicer/reference/extract_strains.md);
+every diagnostic function also takes a `chain` argument.
+[`compare_chains()`](https://plasmogenepi.github.io/snp.slicer/reference/compare_chains.md)
+summarises all chains.
 
 ## Examples
 
@@ -130,7 +161,7 @@ data <- list(
   read0 = matrix(c(90, 95, 85, 92), nrow = 2)
 )
 
-result <- snp_slice(data, model = "negative_binomial", n_mcmc = 1000)
+result <- snp_slice(data, model = "negative_binomial", n_sample = 1000)
 
 # Extract results
 strains <- extract_strains(result)

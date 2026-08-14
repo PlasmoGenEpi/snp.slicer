@@ -60,6 +60,8 @@ This package is licensed under the GPL-3 License.
 
 ## All functions
 
+- [`as_draws_snp_slice()`](https://plasmogenepi.github.io/snp.slicer/reference/as_draws_snp_slice.md)
+  : Assemble a posterior draws array from a SNP-Slice run
 - [`calculate_allele_frequencies()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_allele_frequencies.md)
   : Calculate Allele Frequencies from MCMC Results
 - [`calculate_allele_frequencies_by_sets()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_allele_frequencies_by_sets.md)
@@ -68,8 +70,10 @@ This package is licensed under the GPL-3 License.
   : Calculate estimated individual COI with uncertainty
 - [`clear_performance_log()`](https://plasmogenepi.github.io/snp.slicer/reference/clear_performance_log.md)
   : Clear performance log
-- [`effective_sample_size()`](https://plasmogenepi.github.io/snp.slicer/reference/effective_sample_size.md)
-  : Calculate effective sample size for MCMC diagnostics
+- [`compare_chains()`](https://plasmogenepi.github.io/snp.slicer/reference/compare_chains.md)
+  : Compare chains from a multi-chain run
+- [`convergence_diagnostics()`](https://plasmogenepi.github.io/snp.slicer/reference/convergence_diagnostics.md)
+  : Convergence diagnostics (R-hat and ESS) for a SNP-Slice run
 - [`example_read0`](https://plasmogenepi.github.io/snp.slicer/reference/example_read0.md)
   : Example Read Count Data - Reference Alleles
 - [`example_read1`](https://plasmogenepi.github.io/snp.slicer/reference/example_read1.md)
@@ -80,6 +84,8 @@ This package is licensed under the GPL-3 License.
   : Extract allocation information from SNP-Slice results
 - [`extract_strains()`](https://plasmogenepi.github.io/snp.slicer/reference/extract_strains.md)
   : Extract strain information from SNP-Slice results
+- [`get_chain()`](https://plasmogenepi.github.io/snp.slicer/reference/get_chain.md)
+  : Extract a single chain as a results object
 - [`get_performance_summary()`](https://plasmogenepi.github.io/snp.slicer/reference/get_performance_summary.md)
   : Get performance summary
 - [`load_example_results()`](https://plasmogenepi.github.io/snp.slicer/reference/load_example_results.md)
@@ -88,10 +94,6 @@ This package is licensed under the GPL-3 License.
   : Performance Logger for SNP-Slice
 - [`plot_convergence()`](https://plasmogenepi.github.io/snp.slicer/reference/plot_convergence.md)
   : Plot convergence diagnostics
-- [`print(`*`<ess_all_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.ess_all_results.md)
-  : Print comprehensive ESS results for all parameters
-- [`print(`*`<ess_result>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.ess_result.md)
-  : Print effective sample size results
 - [`print(`*`<snp_slice_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/print.snp_slice_results.md)
   : Print SNP-Slice results
 - [`print_performance_summary()`](https://plasmogenepi.github.io/snp.slicer/reference/print_performance_summary.md)

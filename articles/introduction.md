@@ -36,7 +36,7 @@ read1 <- example_snp_data$read1
 cat("Data dimensions:", nrow(read0), "hosts ×", ncol(read0), "SNPs\n")
 #> Data dimensions: 200 hosts × 96 SNPs
 
-# Pre-computed results (negative binomial model, 2000 MCMC iterations)
+# Pre-computed results (negative binomial model, 3 chains)
 result <- load_example_results()
 cat("Pre-computed results loaded successfully!\n")
 #> Pre-computed results loaded successfully!
@@ -47,7 +47,8 @@ print(result)
 #> ================
 #> Model: negative_binomial 
 #> Dimensions: 200 hosts x 96 strains x 96 SNPs
-#> Strains identified: 49 
+#> Strains identified: 52 
+#> Chains: 3 (best chain: 1 )
 #> Gap Converged: No
 summary(result)
 #> SNP-Slice Results Summary
@@ -58,20 +59,31 @@ summary(result)
 #> Data type: read_counts 
 #> 
 #> Results:
-#> - Number of strains identified: 49 
+#> - Number of strains identified: 52 
 #> - Number of hosts: 200 
 #> - Multiplicity of infection (MOI):
-#>   - Mean MOI: 2.58 
+#>   - Mean MOI: 2.61 
 #>   - Median MOI: 1 
-#>   - Range: 1 - 9 
+#>   - Range: 1 - 11 
 #>   - Single infections: 105 ( 52.5 %)
 #>   - Mixed infections: 95 ( 47.5 %)
 #> 
+#> Chains: 3 (best chain: 1 )
+#>  chain       seed iterations_run map_logpost final_logpost map_kstar n_strains
+#>      1 1235143119           1250   -74834.45     -74968.33       113        52
+#>      2 1756553742           1250   -75096.07     -75202.88       113        48
+#>      3 1891765162           1250   -74918.26     -75013.13       113        53
+#>  gap_converged  best
+#>          FALSE  TRUE
+#>          FALSE FALSE
+#>          FALSE FALSE
+#> 
 #> Convergence:
-#> - Iterations run: 2000 
+#> - Iterations run: 1250 
+#> - Samples retained (post-burn-in): 250 
 #> - Gap Converged: No 
-#> - Final log posterior: -76326.7 
-#> - MAP log posterior: -76280.6 
+#> - Final log posterior: -74968.33 
+#> - MAP log posterior: -74834.45 
 #> - Final k*: 113 
 #> - MAP k*: 113
 ```
@@ -89,21 +101,21 @@ strains <- extract_strains(result)
 allocations <- extract_allocations(result)
 
 cat("Strains identified:", strains$n_strains, "| SNPs:", strains$n_snps, "\n")
-#> Strains identified: 49 | SNPs: 96
+#> Strains identified: 52 | SNPs: 96
 cat("Hosts:", allocations$n_hosts, "\n")
 #> Hosts: 200
 cat("Multiplicity of infection (MOI) summary:\n")
 #> Multiplicity of infection (MOI) summary:
 print(summary(allocations$multiplicity_of_infection))
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   1.000   1.000   1.000   2.585   4.000   9.000
+#>    1.00    1.00    1.00    2.61    4.00   11.00
 
-# Key matrices (also available as result$allocation_matrix, result$dictionary_matrix)
-A <- result$allocation_matrix   # Hosts × Strains
-D <- result$dictionary_matrix   # Strains × SNPs
+# Key matrices
+A <- allocations$allocation_matrix   # Hosts × Strains
+D <- strains$dictionary              # Strains × SNPs
 
 cat("Allocation matrix:", dim(A), "| Dictionary matrix:", dim(D), "\n")
-#> Allocation matrix: 200 49 | Dictionary matrix: 49 96
+#> Allocation matrix: 200 52 | Dictionary matrix: 52 96
 print("Sample allocation (first 3 hosts, first 5 strains):")
 #> [1] "Sample allocation (first 3 hosts, first 5 strains):"
 print(A[1:3, 1:5])
@@ -124,47 +136,49 @@ print(D[1:3, 1:8])
 
 ### Posterior allele frequencies
 
-Compute allele (or haplotype) frequencies for specific SNP sets from the
-MAP or MCMC results. Use `calculate_allele_frequencies` for a single
-set; use `calculate_allele_frequencies_by_sets` for multiple sets at
-once. With MAP you get point estimates and literal counts (`allele`,
-`frequency`, `count`, `total_parasites`). With MCMC you get a posterior
-mean frequency, SD, credible interval, and per-sample mean count
-(`mean_count`, `n_samples`), so the table does not depend on how many
-MCMC samples were used.
+Compute allele (or haplotype) frequencies for specific SNP sets. Use
+`calculate_allele_frequencies` for a single set; use
+`calculate_allele_frequencies_by_sets` for multiple sets at once. The
+`estimate` argument chooses the estimator: `"final_sample"` (the final
+sample of the chain, matching the SNP-Slice paper; the default) and
+`"map"` (the maximum a posteriori allocation) are point estimates giving
+literal counts (`allele`, `frequency`, `count`, `total_parasites`);
+`"posterior"` gives a posterior mean frequency, SD, credible interval,
+and per-sample mean count (`mean_count`, `n_samples`), so the table does
+not depend on how many MCMC samples were used.
 
 ``` r
 
-# Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
+# Single target set: allele frequencies for SNPs 1, 5, and 10 (final sample)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 #>        allele  frequency count total_parasites
-#> 8 ref|ref|ref 0.64216634   332             517
-#> 2 ref|alt|alt 0.14893617    77             517
-#> 3 alt|ref|alt 0.07350097    38             517
-#> 4 ref|ref|alt 0.06576402    34             517
-#> 7 alt|ref|ref 0.03675048    19             517
-#> 5 alt|alt|ref 0.02514507    13             517
+#> 8 ref|ref|ref 0.63428571   333             525
+#> 2 ref|alt|alt 0.13523810    71             525
+#> 3 alt|ref|alt 0.09142857    48             525
+#> 4 ref|ref|alt 0.07428571    39             525
+#> 7 alt|ref|ref 0.03619048    19             525
+#> 6 ref|alt|ref 0.01714286     9             525
 
-# With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
-if (!is.null(result$mcmc_samples)) {
-  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
-  head(allele_freqs_mcmc)
+# Posterior: mean, SD, credible interval, and sample-size-invariant mean_count
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  allele_freqs_post <- calculate_allele_frequencies(result, c(1, 5, 10), estimate = "posterior", n_samples = 50)
+  head(allele_freqs_post)
 }
 #>                  allele  frequency frequency_sd frequency_lower frequency_upper
-#> ref|ref|ref ref|ref|ref 0.65713963  0.020364148      0.64025103      0.71437570
-#> ref|alt|alt ref|alt|alt 0.13666759  0.009814729      0.10973572      0.14966914
-#> alt|ref|alt alt|ref|alt 0.07438880  0.004310763      0.06658317      0.08395745
-#> ref|ref|alt ref|ref|alt 0.06019152  0.008447611      0.03980544      0.06847754
-#> alt|ref|ref alt|ref|ref 0.03728839  0.003938912      0.02994999      0.04316459
-#> alt|alt|ref alt|alt|ref 0.01476765  0.007931272      0.00000000      0.02552901
+#> ref|ref|ref ref|ref|ref 0.63409753  0.002736118     0.631020945      0.63884162
+#> ref|alt|alt ref|alt|alt 0.13803500  0.005609773     0.124605026      0.14621117
+#> alt|ref|alt alt|ref|alt 0.08239172  0.009436347     0.066568441      0.09871358
+#> ref|ref|alt ref|ref|alt 0.07315501  0.004944094     0.066568441      0.08405791
+#> alt|ref|ref alt|ref|ref 0.04225196  0.007466272     0.032224515      0.04961832
+#> ref|alt|ref ref|alt|ref 0.01446428  0.002814664     0.009527899      0.01915281
 #>             mean_count n_samples
-#> ref|ref|ref     329.82        50
-#> ref|alt|alt      68.74        50
-#> alt|ref|alt      37.36        50
-#> ref|ref|alt      30.32        50
-#> alt|ref|ref      18.74        50
-#> alt|alt|ref       7.48        50
+#> ref|ref|ref     332.32        50
+#> ref|alt|alt      72.34        50
+#> alt|ref|alt      43.18        50
+#> ref|ref|alt      38.34        50
+#> alt|ref|ref      22.14        50
+#> ref|alt|ref       7.58        50
 
 # Multiple target sets: pass a named list for one table per set
 target_sets <- list(
@@ -173,13 +187,13 @@ target_sets <- list(
   locus_c = c(20)
 )
 freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
-# Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
+# Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 #>    allele  frequency count total_parasites
-#> 4 ref|ref 0.70793037   366             517
-#> 2 ref|alt 0.15667311    81             517
-#> 3 alt|ref 0.11025145    57             517
-#> 1 alt|alt 0.02514507    13             517
+#> 4 ref|ref 0.70857143   372             525
+#> 2 ref|alt 0.15238095    80             525
+#> 3 alt|ref 0.12761905    67             525
+#> 1 alt|alt 0.01142857     6             525
 ```
 
 ### Individual COI with uncertainty
@@ -187,14 +201,15 @@ print(freqs_by_set$locus_a)
 Per-host complexity of infection (COI) is the number of distinct strains
 per host. Use
 [`calculate_individual_coi()`](https://plasmogenepi.github.io/snp.slicer/reference/calculate_individual_coi.md)
-for a point estimate (MAP) or, when MCMC samples were stored, posterior
+for a point estimate (`estimate = "final_sample"` or `"map"`) or, when
+MCMC samples were stored, `estimate = "posterior"` for the posterior
 mean, SD, and a credible interval.
 
 ``` r
 
-# Point estimate only (from MAP allocation)
-coi_map <- calculate_individual_coi(result, use_map = TRUE)
-head(coi_map)
+# Point estimate (from the final sample of the chain)
+coi_final <- calculate_individual_coi(result, estimate = "final_sample")
+head(coi_final)
 #>   host_index    host_id coi_estimate coi_sd coi_lower coi_upper
 #> 1          1 specimen_1            1     NA        NA        NA
 #> 2          2 specimen_2            1     NA        NA        NA
@@ -204,8 +219,8 @@ head(coi_map)
 #> 6          6 specimen_6            1     NA        NA        NA
 
 # With posterior uncertainty (requires store_mcmc = TRUE)
-if (!is.null(result$mcmc_samples)) {
-  coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50, interval = 0.95)
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  coi_post <- calculate_individual_coi(result, estimate = "posterior", n_samples = 50, interval = 0.95)
   head(coi_post)
   cat("\nSummary of COI posterior SD:\n")
   print(summary(coi_post$coi_sd))
@@ -213,7 +228,7 @@ if (!is.null(result$mcmc_samples)) {
 #> 
 #> Summary of COI posterior SD:
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#> 0.00000 0.00000 0.00000 0.05486 0.00000 1.08965
+#> 0.00000 0.00000 0.00000 0.04924 0.00000 0.99714
 ```
 
 ## Running Your Own Analysis
@@ -226,7 +241,7 @@ If you want to run the analysis yourself, here’s how to do it:
 data <- list(read0 = read0, read1 = read1)
 result <- snp_slice(data, 
                    model = "negative_binomial",
-                   n_mcmc = 2000,      # Number of MCMC iterations
+                   n_sample = 2000,      # Number of retained (post-burn-in) samples
                    store_mcmc = TRUE,  # Store MCMC samples for diagnostics
                    verbose = TRUE)     # Show progress
 ```
@@ -242,8 +257,8 @@ result_tuned <- snp_slice(data,
                          alpha = 1.5,        # IBP concentration parameter
                          rho = 0.3,          # Dictionary sparsity
                          threshold = 0.005,  # Single infection threshold
-                         n_mcmc = 2000,
-                         burnin = 500,       # Custom burn-in
+                         n_sample = 2000,
+                         n_burnin = 500,       # Custom burn-in
                          gap = 10,           # Early stopping threshold
                          seed = 456,         # Reproducibility
                          verbose = FALSE)
@@ -251,32 +266,53 @@ result_tuned <- snp_slice(data,
 
 ## Convergence diagnostics
 
-When you store MCMC samples (`store_mcmc = TRUE`), you can assess
-convergence with effective sample size (ESS) and trace plots:
+When you store MCMC samples (`store_mcmc = TRUE`),
+[`convergence_diagnostics()`](https://plasmogenepi.github.io/snp.slicer/reference/convergence_diagnostics.md)
+reports R-hat and effective sample size (ESS), pooled across all chains,
+for permutation-invariant summaries of the run. R-hat is most
+informative with several chains (run `snp_slice(..., n_chains = 3)`),
+but a single chain still yields a split-R-hat.
 
 ``` r
 
-if (!is.null(result$mcmc_samples)) {
-  # Effective sample size for log posterior
-  ess_logpost <- effective_sample_size(result, parameter = "logpost")
-  ess_val <- if (is.numeric(ess_logpost)) ess_logpost else ess_logpost$ess
-  cat("Effective sample size (log posterior):", round(ess_val, 1), "\n")
-  
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  # R-hat and ESS for the whole run, one row per parameter
+  print(convergence_diagnostics(result))
+
   # Trace plot of log posterior
   plot_convergence(result, type = "logpost")
 } else {
   cat("MCMC samples not stored in results (set store_mcmc = TRUE when running snp_slice)\n")
 }
-#> Effective sample size (log posterior): 18.5
+#>    variable         mean    median         sd        q5       q95     rhat
+#> 1   logpost -75055.92244 -75010.39 122.577982 -75254.45 -74902.59 2.187591
+#> 2 n_strains     51.06133     52.00   2.157725     48.00     53.00 7.593054
+#> 3     kstar    113.00000    113.00   0.000000    113.00    113.00       NA
+#> 4    ktrunc    134.00000    134.00   0.000000    134.00    134.00       NA
+#>   ess_bulk  ess_tail
+#> 1 4.008605 41.678197
+#> 2 3.322269  3.522944
+#> 3       NA        NA
+#> 4       NA        NA
 ```
 
 ![Trace plot of log posterior over MCMC
 iterations.](introduction_files/figure-html/unnamed-chunk-9-1.png)
 
-You can also use `plot_convergence(result, type = "kstar")` for the
-number of active strains or `type = "n_strains"` for strain count over
-iterations. See
-[`?effective_sample_size`](https://plasmogenepi.github.io/snp.slicer/reference/effective_sample_size.md)
+Constant parameters (e.g. `kstar`/`ktrunc` when the dictionary size has
+settled) have zero variance, for which `posterior` returns `NaN` —
+meaning “this parameter did not move”, not a failure.
+
+Use `pars = "coi"` for per-host complexity of infection, which is
+invariant to strain relabeling; element-wise diagnostics on the `A`/`D`
+matrices are intentionally not provided because strain labels are not
+identifiable.
+
+[`as_draws_snp_slice()`](https://plasmogenepi.github.io/snp.slicer/reference/as_draws_snp_slice.md)
+returns the underlying
+[`posterior::draws_array`](https://mc-stan.org/posterior/reference/draws_array.html)
+if you want to apply other `posterior` functions directly. See
+[`?convergence_diagnostics`](https://plasmogenepi.github.io/snp.slicer/reference/convergence_diagnostics.md)
 and
 [`?plot_convergence`](https://plasmogenepi.github.io/snp.slicer/reference/plot_convergence.md)
 for options.
@@ -466,9 +502,9 @@ knitr::kable(summary_stats,
 |:--------------------|-------:|
 | Total Hosts         | 200.00 |
 | Total SNPs          |  96.00 |
-| Total Strains       |  49.00 |
-| Mean MOI            |   2.58 |
-| Max MOI             |   9.00 |
+| Total Strains       |  52.00 |
+| Mean MOI            |   2.61 |
+| Max MOI             |  11.00 |
 | Single Infections   | 105.00 |
 | Multiple Infections |  95.00 |
 
@@ -483,8 +519,8 @@ binomial model. For more:
   `model` argument in
   [`snp_slice()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md).
 - **Diagnostics**: Use
-  [`?effective_sample_size`](https://plasmogenepi.github.io/snp.slicer/reference/effective_sample_size.md)
-  and
+  [`?convergence_diagnostics`](https://plasmogenepi.github.io/snp.slicer/reference/convergence_diagnostics.md)
+  (R-hat and ESS) and
   [`?plot_convergence`](https://plasmogenepi.github.io/snp.slicer/reference/plot_convergence.md)
   when MCMC samples are stored.
 - **Your data**: Apply SNP-Slice to your own read count or categorical
@@ -493,7 +529,7 @@ binomial model. For more:
   and
   [`?load_example_results`](https://plasmogenepi.github.io/snp.slicer/reference/load_example_results.md)
   for input format and examples.
-- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `burnin`, and
+- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `n_burnin`, and
   `gap` for your application.
 
 ## References

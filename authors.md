@@ -2,8 +2,7 @@
 
 ## Authors
 
-- **Maxwell Murphy**. Maintainer.
-  [](https://orcid.org/0000-0003-0332-4388)
+- **Alfred Hubbard**. Author. [](https://orcid.org/0000-0003-4917-7272)
 
 ## Citation
 

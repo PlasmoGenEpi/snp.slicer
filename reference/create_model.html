@@ -45,7 +45,7 @@
 <span>  <span class="va">model</span>,</span>
 <span>  <span class="va">processed_data</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">2.6</span>,</span>
-<span>  rho <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">model</span> <span class="op">==</span> <span class="st">"categorical"</span>, <span class="fl">0.5</span>, <span class="cn">NULL</span><span class="op">)</span>,</span>
+<span>  rho <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="va">model</span> <span class="op">==</span> <span class="st">"categorical"</span><span class="op">)</span> <span class="fl">0.5</span> <span class="kw">else</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -76,11 +76,11 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Maxwell Murphy.</p>
+  <p>Developed by Alfred Hubbard.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

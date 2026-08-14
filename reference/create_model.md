@@ -9,7 +9,7 @@ create_model(
   model,
   processed_data,
   alpha = 2.6,
-  rho = ifelse(model == "categorical", 0.5, NULL),
+  rho = if (model == "categorical") 0.5 else NULL,
   ...
 )
 ```

@@ -104,7 +104,7 @@ binomial model using real example data.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Data dimensions:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">read0</span><span class="op">)</span>, <span class="st">"hosts ×"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">read0</span><span class="op">)</span>, <span class="st">"SNPs\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Data dimensions: 200 hosts × 96 SNPs</span></span>
 <span></span>
-<span><span class="co"># Pre-computed results (negative binomial model, 2000 MCMC iterations)</span></span>
+<span><span class="co"># Pre-computed results (negative binomial model, 3 chains)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/load_example_results.html">load_example_results</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Pre-computed results loaded successfully!\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Pre-computed results loaded successfully!</span></span>
@@ -115,7 +115,8 @@ binomial model using real example data.</p>
 <span><span class="co">#&gt; ================</span></span>
 <span><span class="co">#&gt; Model: negative_binomial </span></span>
 <span><span class="co">#&gt; Dimensions: 200 hosts x 96 strains x 96 SNPs</span></span>
-<span><span class="co">#&gt; Strains identified: 49 </span></span>
+<span><span class="co">#&gt; Strains identified: 52 </span></span>
+<span><span class="co">#&gt; Chains: 3 (best chain: 1 )</span></span>
 <span><span class="co">#&gt; Gap Converged: No</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; SNP-Slice Results Summary</span></span>
@@ -126,20 +127,31 @@ binomial model using real example data.</p>
 <span><span class="co">#&gt; Data type: read_counts </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Results:</span></span>
-<span><span class="co">#&gt; - Number of strains identified: 49 </span></span>
+<span><span class="co">#&gt; - Number of strains identified: 52 </span></span>
 <span><span class="co">#&gt; - Number of hosts: 200 </span></span>
 <span><span class="co">#&gt; - Multiplicity of infection (MOI):</span></span>
-<span><span class="co">#&gt;   - Mean MOI: 2.58 </span></span>
+<span><span class="co">#&gt;   - Mean MOI: 2.61 </span></span>
 <span><span class="co">#&gt;   - Median MOI: 1 </span></span>
-<span><span class="co">#&gt;   - Range: 1 - 9 </span></span>
+<span><span class="co">#&gt;   - Range: 1 - 11 </span></span>
 <span><span class="co">#&gt;   - Single infections: 105 ( 52.5 %)</span></span>
 <span><span class="co">#&gt;   - Mixed infections: 95 ( 47.5 %)</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Chains: 3 (best chain: 1 )</span></span>
+<span><span class="co">#&gt;  chain       seed iterations_run map_logpost final_logpost map_kstar n_strains</span></span>
+<span><span class="co">#&gt;      1 1235143119           1250   -74834.45     -74968.33       113        52</span></span>
+<span><span class="co">#&gt;      2 1756553742           1250   -75096.07     -75202.88       113        48</span></span>
+<span><span class="co">#&gt;      3 1891765162           1250   -74918.26     -75013.13       113        53</span></span>
+<span><span class="co">#&gt;  gap_converged  best</span></span>
+<span><span class="co">#&gt;          FALSE  TRUE</span></span>
+<span><span class="co">#&gt;          FALSE FALSE</span></span>
+<span><span class="co">#&gt;          FALSE FALSE</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Convergence:</span></span>
-<span><span class="co">#&gt; - Iterations run: 2000 </span></span>
+<span><span class="co">#&gt; - Iterations run: 1250 </span></span>
+<span><span class="co">#&gt; - Samples retained (post-burn-in): 250 </span></span>
 <span><span class="co">#&gt; - Gap Converged: No </span></span>
-<span><span class="co">#&gt; - Final log posterior: -76326.7 </span></span>
-<span><span class="co">#&gt; - MAP log posterior: -76280.6 </span></span>
+<span><span class="co">#&gt; - Final log posterior: -74968.33 </span></span>
+<span><span class="co">#&gt; - MAP log posterior: -74834.45 </span></span>
 <span><span class="co">#&gt; - Final k*: 113 </span></span>
 <span><span class="co">#&gt; - MAP k*: 113</span></span></code></pre></div>
 </div>
@@ -155,21 +167,21 @@ Use the extractors for convenience:</p>
 <span><span class="va">allocations</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extract_allocations.html">extract_allocations</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Strains identified:"</span>, <span class="va">strains</span><span class="op">$</span><span class="va">n_strains</span>, <span class="st">"| SNPs:"</span>, <span class="va">strains</span><span class="op">$</span><span class="va">n_snps</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Strains identified: 49 | SNPs: 96</span></span>
+<span><span class="co">#&gt; Strains identified: 52 | SNPs: 96</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Hosts:"</span>, <span class="va">allocations</span><span class="op">$</span><span class="va">n_hosts</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hosts: 200</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Multiplicity of infection (MOI) summary:\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Multiplicity of infection (MOI) summary:</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">allocations</span><span class="op">$</span><span class="va">multiplicity_of_infection</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
-<span><span class="co">#&gt;   1.000   1.000   1.000   2.585   4.000   9.000</span></span>
+<span><span class="co">#&gt;    1.00    1.00    1.00    2.61    4.00   11.00</span></span>
 <span></span>
-<span><span class="co"># Key matrices (also available as result$allocation_matrix, result$dictionary_matrix)</span></span>
-<span><span class="va">A</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">allocation_matrix</span>   <span class="co"># Hosts × Strains</span></span>
-<span><span class="va">D</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">$</span><span class="va">dictionary_matrix</span>   <span class="co"># Strains × SNPs</span></span>
+<span><span class="co"># Key matrices</span></span>
+<span><span class="va">A</span> <span class="op">&lt;-</span> <span class="va">allocations</span><span class="op">$</span><span class="va">allocation_matrix</span>   <span class="co"># Hosts × Strains</span></span>
+<span><span class="va">D</span> <span class="op">&lt;-</span> <span class="va">strains</span><span class="op">$</span><span class="va">dictionary</span>              <span class="co"># Strains × SNPs</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Allocation matrix:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span>, <span class="st">"| Dictionary matrix:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">D</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Allocation matrix: 200 49 | Dictionary matrix: 49 96</span></span>
+<span><span class="co">#&gt; Allocation matrix: 200 52 | Dictionary matrix: 52 96</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Sample allocation (first 3 hosts, first 5 strains):"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Sample allocation (first 3 hosts, first 5 strains):"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span><span class="op">)</span></span>
@@ -191,46 +203,49 @@ Use the extractors for convenience:</p>
 <div class="section level3">
 <h3 id="posterior-allele-frequencies">Posterior allele frequencies<a class="anchor" aria-label="anchor" href="#posterior-allele-frequencies"></a>
 </h3>
-<p>Compute allele (or haplotype) frequencies for specific SNP sets from
-the MAP or MCMC results. Use <code>calculate_allele_frequencies</code>
-for a single set; use <code>calculate_allele_frequencies_by_sets</code>
-for multiple sets at once. With MAP you get point estimates and literal
-counts (<code>allele</code>, <code>frequency</code>, <code>count</code>,
-<code>total_parasites</code>). With MCMC you get a posterior mean
-frequency, SD, credible interval, and per-sample mean count
-(<code>mean_count</code>, <code>n_samples</code>), so the table does not
-depend on how many MCMC samples were used.</p>
+<p>Compute allele (or haplotype) frequencies for specific SNP sets. Use
+<code>calculate_allele_frequencies</code> for a single set; use
+<code>calculate_allele_frequencies_by_sets</code> for multiple sets at
+once. The <code>estimate</code> argument chooses the estimator:
+<code>"final_sample"</code> (the final sample of the chain, matching the
+SNP-Slice paper; the default) and <code>"map"</code> (the maximum a
+posteriori allocation) are point estimates giving literal counts
+(<code>allele</code>, <code>frequency</code>, <code>count</code>,
+<code>total_parasites</code>); <code>"posterior"</code> gives a
+posterior mean frequency, SD, credible interval, and per-sample mean
+count (<code>mean_count</code>, <code>n_samples</code>), so the table
+does not depend on how many MCMC samples were used.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)</span></span>
+<code class="sourceCode R"><span><span class="co"># Single target set: allele frequencies for SNPs 1, 5, and 10 (final sample)</span></span>
 <span><span class="va">allele_freqs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        allele  frequency count total_parasites</span></span>
-<span><span class="co">#&gt; 8 ref|ref|ref 0.64216634   332             517</span></span>
-<span><span class="co">#&gt; 2 ref|alt|alt 0.14893617    77             517</span></span>
-<span><span class="co">#&gt; 3 alt|ref|alt 0.07350097    38             517</span></span>
-<span><span class="co">#&gt; 4 ref|ref|alt 0.06576402    34             517</span></span>
-<span><span class="co">#&gt; 7 alt|ref|ref 0.03675048    19             517</span></span>
-<span><span class="co">#&gt; 5 alt|alt|ref 0.02514507    13             517</span></span>
+<span><span class="co">#&gt; 8 ref|ref|ref 0.63428571   333             525</span></span>
+<span><span class="co">#&gt; 2 ref|alt|alt 0.13523810    71             525</span></span>
+<span><span class="co">#&gt; 3 alt|ref|alt 0.09142857    48             525</span></span>
+<span><span class="co">#&gt; 4 ref|ref|alt 0.07428571    39             525</span></span>
+<span><span class="co">#&gt; 7 alt|ref|ref 0.03619048    19             525</span></span>
+<span><span class="co">#&gt; 6 ref|alt|ref 0.01714286     9             525</span></span>
 <span></span>
-<span><span class="co"># With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">allele_freqs_mcmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, use_map <span class="op">=</span> <span class="cn">FALSE</span>, n_samples <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs_mcmc</span><span class="op">)</span></span>
+<span><span class="co"># Posterior: mean, SD, credible interval, and sample-size-invariant mean_count</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_chain.html">get_chain</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">allele_freqs_post</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, estimate <span class="op">=</span> <span class="st">"posterior"</span>, n_samples <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs_post</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt;                  allele  frequency frequency_sd frequency_lower frequency_upper</span></span>
-<span><span class="co">#&gt; ref|ref|ref ref|ref|ref 0.65713963  0.020364148      0.64025103      0.71437570</span></span>
-<span><span class="co">#&gt; ref|alt|alt ref|alt|alt 0.13666759  0.009814729      0.10973572      0.14966914</span></span>
-<span><span class="co">#&gt; alt|ref|alt alt|ref|alt 0.07438880  0.004310763      0.06658317      0.08395745</span></span>
-<span><span class="co">#&gt; ref|ref|alt ref|ref|alt 0.06019152  0.008447611      0.03980544      0.06847754</span></span>
-<span><span class="co">#&gt; alt|ref|ref alt|ref|ref 0.03728839  0.003938912      0.02994999      0.04316459</span></span>
-<span><span class="co">#&gt; alt|alt|ref alt|alt|ref 0.01476765  0.007931272      0.00000000      0.02552901</span></span>
+<span><span class="co">#&gt; ref|ref|ref ref|ref|ref 0.63409753  0.002736118     0.631020945      0.63884162</span></span>
+<span><span class="co">#&gt; ref|alt|alt ref|alt|alt 0.13803500  0.005609773     0.124605026      0.14621117</span></span>
+<span><span class="co">#&gt; alt|ref|alt alt|ref|alt 0.08239172  0.009436347     0.066568441      0.09871358</span></span>
+<span><span class="co">#&gt; ref|ref|alt ref|ref|alt 0.07315501  0.004944094     0.066568441      0.08405791</span></span>
+<span><span class="co">#&gt; alt|ref|ref alt|ref|ref 0.04225196  0.007466272     0.032224515      0.04961832</span></span>
+<span><span class="co">#&gt; ref|alt|ref ref|alt|ref 0.01446428  0.002814664     0.009527899      0.01915281</span></span>
 <span><span class="co">#&gt;             mean_count n_samples</span></span>
-<span><span class="co">#&gt; ref|ref|ref     329.82        50</span></span>
-<span><span class="co">#&gt; ref|alt|alt      68.74        50</span></span>
-<span><span class="co">#&gt; alt|ref|alt      37.36        50</span></span>
-<span><span class="co">#&gt; ref|ref|alt      30.32        50</span></span>
-<span><span class="co">#&gt; alt|ref|ref      18.74        50</span></span>
-<span><span class="co">#&gt; alt|alt|ref       7.48        50</span></span>
+<span><span class="co">#&gt; ref|ref|ref     332.32        50</span></span>
+<span><span class="co">#&gt; ref|alt|alt      72.34        50</span></span>
+<span><span class="co">#&gt; alt|ref|alt      43.18        50</span></span>
+<span><span class="co">#&gt; ref|ref|alt      38.34        50</span></span>
+<span><span class="co">#&gt; alt|ref|ref      22.14        50</span></span>
+<span><span class="co">#&gt; ref|alt|ref       7.58        50</span></span>
 <span></span>
 <span><span class="co"># Multiple target sets: pass a named list for one table per set</span></span>
 <span><span class="va">target_sets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
@@ -239,25 +254,27 @@ depend on how many MCMC samples were used.</p>
 <span>  locus_c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">freqs_by_set</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies_by_sets.html">calculate_allele_frequencies_by_sets</a></span><span class="op">(</span><span class="va">result</span>, <span class="va">target_sets</span><span class="op">)</span></span>
-<span><span class="co"># Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)</span></span>
+<span><span class="co"># Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">freqs_by_set</span><span class="op">$</span><span class="va">locus_a</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    allele  frequency count total_parasites</span></span>
-<span><span class="co">#&gt; 4 ref|ref 0.70793037   366             517</span></span>
-<span><span class="co">#&gt; 2 ref|alt 0.15667311    81             517</span></span>
-<span><span class="co">#&gt; 3 alt|ref 0.11025145    57             517</span></span>
-<span><span class="co">#&gt; 1 alt|alt 0.02514507    13             517</span></span></code></pre></div>
+<span><span class="co">#&gt; 4 ref|ref 0.70857143   372             525</span></span>
+<span><span class="co">#&gt; 2 ref|alt 0.15238095    80             525</span></span>
+<span><span class="co">#&gt; 3 alt|ref 0.12761905    67             525</span></span>
+<span><span class="co">#&gt; 1 alt|alt 0.01142857     6             525</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="individual-coi-with-uncertainty">Individual COI with uncertainty<a class="anchor" aria-label="anchor" href="#individual-coi-with-uncertainty"></a>
 </h3>
 <p>Per-host complexity of infection (COI) is the number of distinct
 strains per host. Use <code><a href="../reference/calculate_individual_coi.html">calculate_individual_coi()</a></code> for a
-point estimate (MAP) or, when MCMC samples were stored, posterior mean,
-SD, and a credible interval.</p>
+point estimate (<code>estimate = "final_sample"</code> or
+<code>"map"</code>) or, when MCMC samples were stored,
+<code>estimate = "posterior"</code> for the posterior mean, SD, and a
+credible interval.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Point estimate only (from MAP allocation)</span></span>
-<span><span class="va">coi_map</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_individual_coi.html">calculate_individual_coi</a></span><span class="op">(</span><span class="va">result</span>, use_map <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">coi_map</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Point estimate (from the final sample of the chain)</span></span>
+<span><span class="va">coi_final</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_individual_coi.html">calculate_individual_coi</a></span><span class="op">(</span><span class="va">result</span>, estimate <span class="op">=</span> <span class="st">"final_sample"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">coi_final</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   host_index    host_id coi_estimate coi_sd coi_lower coi_upper</span></span>
 <span><span class="co">#&gt; 1          1 specimen_1            1     NA        NA        NA</span></span>
 <span><span class="co">#&gt; 2          2 specimen_2            1     NA        NA        NA</span></span>
@@ -267,8 +284,8 @@ SD, and a credible interval.</p>
 <span><span class="co">#&gt; 6          6 specimen_6            1     NA        NA        NA</span></span>
 <span></span>
 <span><span class="co"># With posterior uncertainty (requires store_mcmc = TRUE)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">coi_post</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_individual_coi.html">calculate_individual_coi</a></span><span class="op">(</span><span class="va">result</span>, use_map <span class="op">=</span> <span class="cn">FALSE</span>, n_samples <span class="op">=</span> <span class="fl">50</span>, interval <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_chain.html">get_chain</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">coi_post</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_individual_coi.html">calculate_individual_coi</a></span><span class="op">(</span><span class="va">result</span>, estimate <span class="op">=</span> <span class="st">"posterior"</span>, n_samples <span class="op">=</span> <span class="fl">50</span>, interval <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">coi_post</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"\nSummary of COI posterior SD:\n"</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">coi_post</span><span class="op">$</span><span class="va">coi_sd</span><span class="op">)</span><span class="op">)</span></span>
@@ -276,7 +293,7 @@ SD, and a credible interval.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Summary of COI posterior SD:</span></span>
 <span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
-<span><span class="co">#&gt; 0.00000 0.00000 0.00000 0.05486 0.00000 1.08965</span></span></code></pre></div>
+<span><span class="co">#&gt; 0.00000 0.00000 0.00000 0.04924 0.00000 0.99714</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -288,7 +305,7 @@ SD, and a credible interval.</p>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>read0 <span class="op">=</span> <span class="va">read0</span>, read1 <span class="op">=</span> <span class="va">read1</span><span class="op">)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/snp_slice.html">snp_slice</a></span><span class="op">(</span><span class="va">data</span>, </span>
 <span>                   model <span class="op">=</span> <span class="st">"negative_binomial"</span>,</span>
-<span>                   n_mcmc <span class="op">=</span> <span class="fl">2000</span>,      <span class="co"># Number of MCMC iterations</span></span>
+<span>                   n_sample <span class="op">=</span> <span class="fl">2000</span>,      <span class="co"># Number of retained (post-burn-in) samples</span></span>
 <span>                   store_mcmc <span class="op">=</span> <span class="cn">TRUE</span>,  <span class="co"># Store MCMC samples for diagnostics</span></span>
 <span>                   verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>     <span class="co"># Show progress</span></span></code></pre></div>
 </div>
@@ -302,8 +319,8 @@ SD, and a credible interval.</p>
 <span>                         alpha <span class="op">=</span> <span class="fl">1.5</span>,        <span class="co"># IBP concentration parameter</span></span>
 <span>                         rho <span class="op">=</span> <span class="fl">0.3</span>,          <span class="co"># Dictionary sparsity</span></span>
 <span>                         threshold <span class="op">=</span> <span class="fl">0.005</span>,  <span class="co"># Single infection threshold</span></span>
-<span>                         n_mcmc <span class="op">=</span> <span class="fl">2000</span>,</span>
-<span>                         burnin <span class="op">=</span> <span class="fl">500</span>,       <span class="co"># Custom burn-in</span></span>
+<span>                         n_sample <span class="op">=</span> <span class="fl">2000</span>,</span>
+<span>                         n_burnin <span class="op">=</span> <span class="fl">500</span>,       <span class="co"># Custom burn-in</span></span>
 <span>                         gap <span class="op">=</span> <span class="fl">10</span>,           <span class="co"># Early stopping threshold</span></span>
 <span>                         seed <span class="op">=</span> <span class="fl">456</span>,         <span class="co"># Reproducibility</span></span>
 <span>                         verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
@@ -311,27 +328,46 @@ SD, and a credible interval.</p>
 <div class="section level2">
 <h2 id="convergence-diagnostics">Convergence diagnostics<a class="anchor" aria-label="anchor" href="#convergence-diagnostics"></a>
 </h2>
-<p>When you store MCMC samples (<code>store_mcmc = TRUE</code>), you can
-assess convergence with effective sample size (ESS) and trace plots:</p>
+<p>When you store MCMC samples (<code>store_mcmc = TRUE</code>),
+<code><a href="../reference/convergence_diagnostics.html">convergence_diagnostics()</a></code> reports R-hat and effective
+sample size (ESS), pooled across all chains, for permutation-invariant
+summaries of the run. R-hat is most informative with several chains (run
+<code>snp_slice(..., n_chains = 3)</code>), but a single chain still
+yields a split-R-hat.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="co"># Effective sample size for log posterior</span></span>
-<span>  <span class="va">ess_logpost</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/effective_sample_size.html">effective_sample_size</a></span><span class="op">(</span><span class="va">result</span>, parameter <span class="op">=</span> <span class="st">"logpost"</span><span class="op">)</span></span>
-<span>  <span class="va">ess_val</span> <span class="op">&lt;-</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">ess_logpost</span><span class="op">)</span><span class="op">)</span> <span class="va">ess_logpost</span> <span class="kw">else</span> <span class="va">ess_logpost</span><span class="op">$</span><span class="va">ess</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Effective sample size (log posterior):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ess_val</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span>  </span>
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_chain.html">get_chain</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="co"># R-hat and ESS for the whole run, one row per parameter</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="../reference/convergence_diagnostics.html">convergence_diagnostics</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
 <span>  <span class="co"># Trace plot of log posterior</span></span>
 <span>  <span class="fu"><a href="../reference/plot_convergence.html">plot_convergence</a></span><span class="op">(</span><span class="va">result</span>, type <span class="op">=</span> <span class="st">"logpost"</span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"MCMC samples not stored in results (set store_mcmc = TRUE when running snp_slice)\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="co">#&gt; Effective sample size (log posterior): 18.5</span></span></code></pre></div>
+<span><span class="co">#&gt;    variable         mean    median         sd        q5       q95     rhat</span></span>
+<span><span class="co">#&gt; 1   logpost -75055.92244 -75010.39 122.577982 -75254.45 -74902.59 2.187591</span></span>
+<span><span class="co">#&gt; 2 n_strains     51.06133     52.00   2.157725     48.00     53.00 7.593054</span></span>
+<span><span class="co">#&gt; 3     kstar    113.00000    113.00   0.000000    113.00    113.00       NA</span></span>
+<span><span class="co">#&gt; 4    ktrunc    134.00000    134.00   0.000000    134.00    134.00       NA</span></span>
+<span><span class="co">#&gt;   ess_bulk  ess_tail</span></span>
+<span><span class="co">#&gt; 1 4.008605 41.678197</span></span>
+<span><span class="co">#&gt; 2 3.322269  3.522944</span></span>
+<span><span class="co">#&gt; 3       NA        NA</span></span>
+<span><span class="co">#&gt; 4       NA        NA</span></span></code></pre></div>
 <p><img src="introduction_files/figure-html/unnamed-chunk-9-1.png" class="r-plt" alt="Trace plot of log posterior over MCMC iterations." width="672"></p>
-<p>You can also use
-<code>plot_convergence(result, type = "kstar")</code> for the number of
-active strains or <code>type = "n_strains"</code> for strain count over
-iterations. See <code><a href="../reference/effective_sample_size.html">?effective_sample_size</a></code> and
-<code><a href="../reference/plot_convergence.html">?plot_convergence</a></code> for options.</p>
+<p>Constant parameters (e.g. <code>kstar</code>/<code>ktrunc</code> when
+the dictionary size has settled) have zero variance, for which
+<code>posterior</code> returns <code>NaN</code> — meaning “this
+parameter did not move”, not a failure.</p>
+<p>Use <code>pars = "coi"</code> for per-host complexity of infection,
+which is invariant to strain relabeling; element-wise diagnostics on the
+<code>A</code>/<code>D</code> matrices are intentionally not provided
+because strain labels are not identifiable.</p>
+<p><code><a href="../reference/as_draws_snp_slice.html">as_draws_snp_slice()</a></code> returns the underlying
+<code><a href="https://mc-stan.org/posterior/reference/draws_array.html" class="external-link">posterior::draws_array</a></code> if you want to apply other
+<code>posterior</code> functions directly. See
+<code><a href="../reference/convergence_diagnostics.html">?convergence_diagnostics</a></code> and <code><a href="../reference/plot_convergence.html">?plot_convergence</a></code>
+for options.</p>
 </div>
 <div class="section level2">
 <h2 id="visualizing-results">Visualizing results<a class="anchor" aria-label="anchor" href="#visualizing-results"></a>
@@ -514,15 +550,15 @@ results:</p>
 </tr>
 <tr class="odd">
 <td align="left">Total Strains</td>
-<td align="right">49.00</td>
+<td align="right">52.00</td>
 </tr>
 <tr class="even">
 <td align="left">Mean MOI</td>
-<td align="right">2.58</td>
+<td align="right">2.61</td>
 </tr>
 <tr class="odd">
 <td align="left">Max MOI</td>
-<td align="right">9.00</td>
+<td align="right">11.00</td>
 </tr>
 <tr class="even">
 <td align="left">Single Infections</td>
@@ -548,15 +584,15 @@ models via the <code>model</code> argument in
 <code><a href="../reference/snp_slice.html">snp_slice()</a></code>.</li>
 <li>
 <strong>Diagnostics</strong>: Use
-<code><a href="../reference/effective_sample_size.html">?effective_sample_size</a></code> and <code><a href="../reference/plot_convergence.html">?plot_convergence</a></code>
-when MCMC samples are stored.</li>
+<code><a href="../reference/convergence_diagnostics.html">?convergence_diagnostics</a></code> (R-hat and ESS) and
+<code><a href="../reference/plot_convergence.html">?plot_convergence</a></code> when MCMC samples are stored.</li>
 <li>
 <strong>Your data</strong>: Apply SNP-Slice to your own read count
 or categorical data; see <code><a href="../reference/snp_slice.html">?snp_slice</a></code> and
 <code><a href="../reference/load_example_results.html">?load_example_results</a></code> for input format and examples.</li>
 <li>
 <strong>Parameters</strong>: Fine-tune <code>alpha</code>,
-<code>rho</code>, <code>threshold</code>, <code>burnin</code>, and
+<code>rho</code>, <code>threshold</code>, <code>n_burnin</code>, and
 <code>gap</code> for your application.</li>
 </ul>
 </div>
@@ -577,11 +613,11 @@ preprint</a></li>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Maxwell Murphy.</p>
+  <p>Developed by Alfred Hubbard.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

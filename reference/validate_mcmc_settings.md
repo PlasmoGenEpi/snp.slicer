@@ -5,18 +5,18 @@ Validate MCMC settings
 ## Usage
 
 ``` r
-validate_mcmc_settings(n_mcmc, burnin, gap)
+validate_mcmc_settings(n_sample, n_burnin, gap, n_chains = 1, n_cores = 1)
 ```
 
 ## Arguments
 
-- n_mcmc:
+- n_sample:
 
-  Number of MCMC iterations
+  Number of post-burn-in iterations to retain
 
-- burnin:
+- n_burnin:
 
-  Burn-in period
+  Number of iterations discarded before sampling begins
 
 - gap:
 

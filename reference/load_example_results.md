@@ -1,8 +1,11 @@
 # Load Example Analysis Results
 
 Loads pre-computed SNP-Slice analysis results from the example data.
-These results were generated using the negative binomial model with 2000
-MCMC iterations.
+These results were generated using the negative binomial model with 3
+chains, each with 1000 burn-in iterations followed by 250 retained
+samples, so that
+[`convergence_diagnostics`](https://plasmogenepi.github.io/snp.slicer/reference/convergence_diagnostics.md)
+can report between-chain R-hat and ESS.
 
 ## Usage
 
@@ -24,7 +27,8 @@ print(result)
 #> ================
 #> Model: negative_binomial 
 #> Dimensions: 200 hosts x 96 strains x 96 SNPs
-#> Strains identified: 49 
+#> Strains identified: 52 
+#> Chains: 3 (best chain: 1 )
 #> Gap Converged: No 
 #> 
 ```

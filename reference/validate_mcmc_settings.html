@@ -41,19 +41,19 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_mcmc_settings</span><span class="op">(</span><span class="va">n_mcmc</span>, <span class="va">burnin</span>, <span class="va">gap</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_mcmc_settings</span><span class="op">(</span><span class="va">n_sample</span>, <span class="va">n_burnin</span>, <span class="va">gap</span>, n_chains <span class="op">=</span> <span class="fl">1</span>, n_cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
 
 
-<dl><dt id="arg-n-mcmc">n_mcmc<a class="anchor" aria-label="anchor" href="#arg-n-mcmc"></a></dt>
-<dd><p>Number of MCMC iterations</p></dd>
+<dl><dt id="arg-n-sample">n_sample<a class="anchor" aria-label="anchor" href="#arg-n-sample"></a></dt>
+<dd><p>Number of post-burn-in iterations to retain</p></dd>
 
 
-<dt id="arg-burnin">burnin<a class="anchor" aria-label="anchor" href="#arg-burnin"></a></dt>
-<dd><p>Burn-in period</p></dd>
+<dt id="arg-n-burnin">n_burnin<a class="anchor" aria-label="anchor" href="#arg-n-burnin"></a></dt>
+<dd><p>Number of iterations discarded before sampling begins</p></dd>
 
 
 <dt id="arg-gap">gap<a class="anchor" aria-label="anchor" href="#arg-gap"></a></dt>
@@ -70,11 +70,11 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Maxwell Murphy.</p>
+  <p>Developed by Alfred Hubbard.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>
