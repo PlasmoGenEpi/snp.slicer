@@ -51,7 +51,7 @@ read0 <- example_snp_data$read0
 read1 <- example_snp_data$read1
 cat("Data dimensions:", nrow(read0), "hosts ×", ncol(read0), "SNPs\n")
 
-# Pre-computed results (negative binomial model, 2000 MCMC iterations)
+# Pre-computed results (negative binomial model, 3 chains)
 result <- load_example_results()
 cat("Pre-computed results loaded successfully!\n")
 
@@ -74,9 +74,9 @@ cat("Hosts:", allocations$n_hosts, "\n")
 cat("Multiplicity of infection (MOI) summary:\n")
 print(summary(allocations$multiplicity_of_infection))
 
-# Key matrices (also available as result$allocation_matrix, result$dictionary_matrix)
-A <- result$allocation_matrix   # Hosts × Strains
-D <- result$dictionary_matrix   # Strains × SNPs
+# Key matrices
+A <- allocations$allocation_matrix   # Hosts × Strains
+D <- strains$dictionary              # Strains × SNPs
 
 cat("Allocation matrix:", dim(A), "| Dictionary matrix:", dim(D), "\n")
 print("Sample allocation (first 3 hosts, first 5 strains):")
@@ -89,17 +89,17 @@ print(D[1:3, 1:8])
 
 ### Posterior allele frequencies
 
-Compute allele (or haplotype) frequencies for specific SNP sets from the MAP or MCMC results. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once. With MAP you get point estimates and literal counts (`allele`, `frequency`, `count`, `total_parasites`). With MCMC you get a posterior mean frequency, SD, credible interval, and per-sample mean count (`mean_count`, `n_samples`), so the table does not depend on how many MCMC samples were used.
+Compute allele (or haplotype) frequencies for specific SNP sets. Use `calculate_allele_frequencies` for a single set; use `calculate_allele_frequencies_by_sets` for multiple sets at once. The `estimate` argument chooses the estimator: `"final_sample"` (the final sample of the chain, matching the SNP-Slice paper; the default) and `"map"` (the maximum a posteriori allocation) are point estimates giving literal counts (`allele`, `frequency`, `count`, `total_parasites`); `"posterior"` gives a posterior mean frequency, SD, credible interval, and per-sample mean count (`mean_count`, `n_samples`), so the table does not depend on how many MCMC samples were used.
 
 ```{r}
-# Single target set: allele frequencies for SNPs 1, 5, and 10 (MAP)
+# Single target set: allele frequencies for SNPs 1, 5, and 10 (final sample)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 
-# With MCMC: posterior mean, SD, credible interval, and sample-size-invariant mean_count
-if (!is.null(result$mcmc_samples)) {
-  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
-  head(allele_freqs_mcmc)
+# Posterior: mean, SD, credible interval, and sample-size-invariant mean_count
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  allele_freqs_post <- calculate_allele_frequencies(result, c(1, 5, 10), estimate = "posterior", n_samples = 50)
+  head(allele_freqs_post)
 }
 
 # Multiple target sets: pass a named list for one table per set
@@ -109,22 +109,22 @@ target_sets <- list(
   locus_c = c(20)
 )
 freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
-# Each element is a frequency table (MAP: allele, frequency, count, total_parasites; MCMC: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
+# Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 ```
 
 ### Individual COI with uncertainty
 
-Per-host complexity of infection (COI) is the number of distinct strains per host. Use `calculate_individual_coi()` for a point estimate (MAP) or, when MCMC samples were stored, posterior mean, SD, and a credible interval.
+Per-host complexity of infection (COI) is the number of distinct strains per host. Use `calculate_individual_coi()` for a point estimate (`estimate = "final_sample"` or `"map"`) or, when MCMC samples were stored, `estimate = "posterior"` for the posterior mean, SD, and a credible interval.
 
 ```{r}
-# Point estimate only (from MAP allocation)
-coi_map <- calculate_individual_coi(result, use_map = TRUE)
-head(coi_map)
+# Point estimate (from the final sample of the chain)
+coi_final <- calculate_individual_coi(result, estimate = "final_sample")
+head(coi_final)
 
 # With posterior uncertainty (requires store_mcmc = TRUE)
-if (!is.null(result$mcmc_samples)) {
-  coi_post <- calculate_individual_coi(result, use_map = FALSE, n_samples = 50, interval = 0.95)
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  coi_post <- calculate_individual_coi(result, estimate = "posterior", n_samples = 50, interval = 0.95)
   head(coi_post)
   cat("\nSummary of COI posterior SD:\n")
   print(summary(coi_post$coi_sd))
@@ -140,7 +140,7 @@ If you want to run the analysis yourself, here's how to do it:
 data <- list(read0 = read0, read1 = read1)
 result <- snp_slice(data, 
                    model = "negative_binomial",
-                   n_mcmc = 2000,      # Number of MCMC iterations
+                   n_sample = 2000,      # Number of retained (post-burn-in) samples
                    store_mcmc = TRUE,  # Store MCMC samples for diagnostics
                    verbose = TRUE)     # Show progress
 ```
@@ -155,8 +155,8 @@ result_tuned <- snp_slice(data,
                          alpha = 1.5,        # IBP concentration parameter
                          rho = 0.3,          # Dictionary sparsity
                          threshold = 0.005,  # Single infection threshold
-                         n_mcmc = 2000,
-                         burnin = 500,       # Custom burn-in
+                         n_sample = 2000,
+                         n_burnin = 500,       # Custom burn-in
                          gap = 10,           # Early stopping threshold
                          seed = 456,         # Reproducibility
                          verbose = FALSE)
@@ -164,15 +164,13 @@ result_tuned <- snp_slice(data,
 
 ## Convergence diagnostics
 
-When you store MCMC samples (`store_mcmc = TRUE`), you can assess convergence with effective sample size (ESS) and trace plots:
+When you store MCMC samples (`store_mcmc = TRUE`), `convergence_diagnostics()` reports R-hat and effective sample size (ESS), pooled across all chains, for permutation-invariant summaries of the run. R-hat is most informative with several chains (run `snp_slice(..., n_chains = 3)`), but a single chain still yields a split-R-hat.
 
 ```{r, fig.alt = "Trace plot of log posterior over MCMC iterations."}
-if (!is.null(result$mcmc_samples)) {
-  # Effective sample size for log posterior
-  ess_logpost <- effective_sample_size(result, parameter = "logpost")
-  ess_val <- if (is.numeric(ess_logpost)) ess_logpost else ess_logpost$ess
-  cat("Effective sample size (log posterior):", round(ess_val, 1), "\n")
-  
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  # R-hat and ESS for the whole run, one row per parameter
+  print(convergence_diagnostics(result))
+
   # Trace plot of log posterior
   plot_convergence(result, type = "logpost")
 } else {
@@ -180,7 +178,11 @@ if (!is.null(result$mcmc_samples)) {
 }
 ```
 
-You can also use `plot_convergence(result, type = "kstar")` for the number of active strains or `type = "n_strains"` for strain count over iterations. See `?effective_sample_size` and `?plot_convergence` for options.
+Constant parameters (e.g. `kstar`/`ktrunc` when the dictionary size has settled) have zero variance, for which `posterior` returns `NaN` — meaning "this parameter did not move", not a failure.
+
+Use `pars = "coi"` for per-host complexity of infection, which is invariant to strain relabeling; element-wise diagnostics on the `A`/`D` matrices are intentionally not provided because strain labels are not identifiable.
+
+`as_draws_snp_slice()` returns the underlying `posterior::draws_array` if you want to apply other `posterior` functions directly. See `?convergence_diagnostics` and `?plot_convergence` for options.
 
 ## Visualizing results
 
@@ -349,9 +351,9 @@ knitr::kable(summary_stats,
 This vignette covered the basics of using SNP-Slice with the negative binomial model. For more:
 
 - **Other models**: Try Poisson, binomial, or categorical models via the `model` argument in `snp_slice()`.
-- **Diagnostics**: Use `?effective_sample_size` and `?plot_convergence` when MCMC samples are stored.
+- **Diagnostics**: Use `?convergence_diagnostics` (R-hat and ESS) and `?plot_convergence` when MCMC samples are stored.
 - **Your data**: Apply SNP-Slice to your own read count or categorical data; see `?snp_slice` and `?load_example_results` for input format and examples.
-- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `burnin`, and `gap` for your application.
+- **Parameters**: Fine-tune `alpha`, `rho`, `threshold`, `n_burnin`, and `gap` for your application.
 
 ## References
 

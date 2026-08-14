@@ -51,7 +51,7 @@ test_that("Poisson model works with read count data", {
   expect_no_error({
     result <- snp_slice_poisson(
         data,
-        n_mcmc = 25,  # Short run for testing
+        n_sample = 25,  # Short run for testing
         verbose = FALSE,
         store_mcmc = TRUE
     )
@@ -60,10 +60,10 @@ test_that("Poisson model works with read count data", {
   # Check that the result has the expected structure
   expect_s3_class(result, "snp_slice_results")
   expect_equal(result$model_info$model, "poisson")
-  expect_true(length(result$mcmc_samples) > 0)
-  expect_true("A" %in% names(result$mcmc_samples[[1]]))
-  expect_true("D" %in% names(result$mcmc_samples[[1]]))
-  expect_true("mu" %in% names(result$mcmc_samples[[1]]))
+  expect_true(length(get_chain(result)$mcmc_samples) > 0)
+  expect_true("A" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("D" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("mu" %in% names(get_chain(result)$mcmc_samples[[1]]))
   
   # Test that we can extract strains and allocations
   expect_no_error({
@@ -104,7 +104,7 @@ test_that("Negative Binomial model works with read count data", {
       read1 = small_read1,
       read0 = small_read0
     ), 
-                                         n_mcmc = 25,  # Short run for testing
+                                         n_sample = 25,  # Short run for testing
                                          verbose = FALSE,
                                          store_mcmc = TRUE)
   })
@@ -112,10 +112,10 @@ test_that("Negative Binomial model works with read count data", {
   # Check that the result has the expected structure
   expect_s3_class(result, "snp_slice_results")
   expect_equal(result$model_info$model, "negative_binomial")
-  expect_true(length(result$mcmc_samples) > 0)
-  expect_true("A" %in% names(result$mcmc_samples[[1]]))
-  expect_true("D" %in% names(result$mcmc_samples[[1]]))
-  expect_true("mu" %in% names(result$mcmc_samples[[1]]))
+  expect_true(length(get_chain(result)$mcmc_samples) > 0)
+  expect_true("A" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("D" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("mu" %in% names(get_chain(result)$mcmc_samples[[1]]))
   
   # Test that we can extract strains and allocations
   expect_no_error({
@@ -156,7 +156,7 @@ test_that("Binomial model works with read count models", {
       read1 = small_read1,
       read0 = small_read0
     ), 
-                                n_mcmc = 25,  # Short run for testing
+                                n_sample = 25,  # Short run for testing
                                 verbose = FALSE,
                                 store_mcmc = TRUE)
   })
@@ -164,10 +164,10 @@ test_that("Binomial model works with read count models", {
   # Check that the result has the expected structure
   expect_s3_class(result, "snp_slice_results")
   expect_equal(result$model_info$model, "binomial")
-  expect_true(length(result$mcmc_samples) > 0)
-  expect_true("A" %in% names(result$mcmc_samples[[1]]))
-  expect_true("D" %in% names(result$mcmc_samples[[1]]))
-  expect_true("mu" %in% names(result$mcmc_samples[[1]]))
+  expect_true(length(get_chain(result)$mcmc_samples) > 0)
+  expect_true("A" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("D" %in% names(get_chain(result)$mcmc_samples[[1]]))
+  expect_true("mu" %in% names(get_chain(result)$mcmc_samples[[1]]))
   
   # Test that we can extract strains and allocations
   expect_no_error({
@@ -270,25 +270,25 @@ test_that("read count models converge and produce reasonable results", {
         read1 = small_read1,
         read0 = small_read0
       ), 
-                          n_mcmc = 25,  # Short run for convergence testing
+                          n_sample = 25,  # Short run for convergence testing
                           verbose = FALSE,
                           store_mcmc = TRUE)
     })
     
     # Check that the model converged (log-posterior is finite)
-    expect_true(is.finite(result$diagnostics$final_logpost))
-    expect_true(is.finite(result$diagnostics$map_logpost))
+    expect_true(is.finite(get_chain(result)$diagnostics$final_logpost))
+    expect_true(is.finite(get_chain(result)$diagnostics$map_logpost))
     
     # Check that we have some active strains
-    expect_true(result$diagnostics$final_kstar > 0)
+    expect_true(get_chain(result)$diagnostics$final_kstar > 0)
     
     # Check that the number of active strains is reasonable
     # (should be less than the number of hosts)
-    expect_true(result$diagnostics$final_kstar <= nrow(small_read1))
+    expect_true(get_chain(result)$diagnostics$final_kstar <= nrow(small_read1))
     
     # Check that we have some active strains
-    expect_true(result$diagnostics$final_kstar > 0)
-    expect_true(result$diagnostics$final_kstar <= nrow(small_read1))
+    expect_true(get_chain(result)$diagnostics$final_kstar > 0)
+    expect_true(get_chain(result)$diagnostics$final_kstar <= nrow(small_read1))
   }
 })
 
@@ -326,14 +326,14 @@ test_that("read count models handle different parameter settings", {
         read1 = small_read1,
         read0 = small_read0
       ), 
-                                 n_mcmc = 25,  # Short run for testing
+                                 n_sample = 25,  # Short run for testing
                                  alpha = params$alpha,
                                  rho = params$rho,
                                  verbose = FALSE)
     })
     
     # Check that the model ran successfully
-    expect_true(is.finite(result$diagnostics$final_logpost))
-    expect_true(result$diagnostics$final_kstar > 0)
+    expect_true(is.finite(get_chain(result)$diagnostics$final_logpost))
+    expect_true(get_chain(result)$diagnostics$final_kstar > 0)
   }
 })

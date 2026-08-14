@@ -10,13 +10,15 @@ test_that("load_example_results works correctly", {
   expect_true(is.list(result))
   
   # Check required components
-  expect_true("allocation_matrix" %in% names(result))
-  expect_true("dictionary_matrix" %in% names(result))
+  expect_true("chains" %in% names(result))
+  expect_true("best_chain" %in% names(result))
   expect_true("model_info" %in% names(result))
+  expect_true("map_allocation_matrix" %in% names(get_chain(result)))
+  expect_true("map_dictionary_matrix" %in% names(get_chain(result)))
   
   # Check dimensions (should match our example data)
-  expect_equal(nrow(result$allocation_matrix), 200)  # 200 hosts
-  expect_equal(ncol(result$dictionary_matrix), 96)   # 96 SNPs
+  expect_equal(nrow(get_chain(result)$map_allocation_matrix), 200)  # 200 hosts
+  expect_equal(ncol(get_chain(result)$map_dictionary_matrix), 96)   # 96 SNPs
   
   # Check model info (N, P in processed_data)
   expect_equal(result$model_info$model, "negative_binomial")
@@ -116,47 +118,35 @@ test_that("print.snp_slice_results works with real data", {
   expect_true(any(grepl("96", output)))
 })
 
-test_that("effective_sample_size works with real data when MCMC samples are available", {
+test_that("convergence_diagnostics works with real data when MCMC samples are available", {
   result <- load_example_results()
-  
+
   # Only test if MCMC samples are available
-  if (!is.null(result$mcmc_samples)) {
-    # Test logpost ESS
-    ess_logpost <- effective_sample_size(result, parameter = "logpost")
-    expect_true(is.list(ess_logpost))
-    expect_equal(ess_logpost$parameter, "logpost")
-    expect_true(ess_logpost$ess > 0)
-    expect_true(ess_logpost$n_samples > 0)
-    
-    # Test kstar ESS (may be NaN if kstar is constant)
-    ess_kstar <- effective_sample_size(result, parameter = "kstar")
-    expect_equal(ess_kstar$parameter, "kstar")
-    # kstar ESS might be NaN if the parameter is constant
-    expect_true(ess_kstar$ess > 0 || is.nan(ess_kstar$ess))
-    
-    # Test different methods for logpost
-    ess_auto <- effective_sample_size(result, parameter = "logpost", method = "autocorrelation")
-    ess_batch <- effective_sample_size(result, parameter = "logpost", method = "batch_means")
-    ess_spec <- effective_sample_size(result, parameter = "logpost", method = "spectral")
-    
-    expect_equal(ess_auto$method, "autocorrelation")
-    expect_equal(ess_batch$method, "batch_means")
-    expect_equal(ess_spec$method, "spectral")
-    
-    # All should have positive ESS
-    expect_true(ess_auto$ess > 0)
-    expect_true(ess_batch$ess > 0)
-    expect_true(ess_spec$ess > 0)
+  if (!is.null(get_chain(result)$mcmc_samples)) {
+    diag <- convergence_diagnostics(result)
+
+    # One row per default parameter, with the expected diagnostic columns
+    expect_s3_class(diag, "data.frame")
+    expect_setequal(diag$variable, c("logpost", "n_strains", "kstar", "ktrunc"))
+    expect_true(all(c("rhat", "ess_bulk", "ess_tail") %in% names(diag)))
+
+    # logpost varies, so its diagnostics are finite; constant parameters
+    # (e.g. kstar/ktrunc) legitimately yield NaN
+    logpost <- diag[diag$variable == "logpost", ]
+    expect_true(is.finite(logpost$ess_bulk))
+    expect_true(logpost$ess_bulk > 0)
+
+    # Per-host COI expands to one row per host
+    coi_diag <- convergence_diagnostics(result, pars = "coi")
+    expect_equal(nrow(coi_diag), 200)
   } else {
-    # If no MCMC samples, should get appropriate message
-    expect_message(effective_sample_size(result, parameter = "logpost"), 
-                  "MCMC samples not stored")
+    expect_error(convergence_diagnostics(result), "MCMC samples not stored")
   }
 })
 
 test_that("strain diversity analysis works with real data", {
   result <- load_example_results()
-  A <- result$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Calculate strain diversity
   strain_diversity <- rowSums(A > 0)
@@ -181,7 +171,7 @@ test_that("strain diversity analysis works with real data", {
 
 test_that("strain frequency analysis works with real data", {
   result <- load_example_results()
-  A <- result$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Calculate strain frequencies
   strain_frequencies <- colSums(A)
@@ -203,7 +193,7 @@ test_that("strain frequency analysis works with real data", {
 
 test_that("dictionary matrix analysis works with real data", {
   result <- load_example_results()
-  D <- result$dictionary_matrix
+  D <- get_chain(result)$map_dictionary_matrix
   
   # Check basic properties
   expect_true(is.matrix(D))
@@ -224,7 +214,7 @@ test_that("dictionary matrix analysis works with real data", {
 
 test_that("allocation matrix analysis works with real data", {
   result <- load_example_results()
-  A <- result$allocation_matrix
+  A <- get_chain(result)$map_allocation_matrix
   
   # Check basic properties
   expect_true(is.matrix(A))
@@ -253,16 +243,16 @@ test_that("model information is consistent", {
   expect_equal(result$model_info$processed_data$P, 96)
   
   # Check consistency with matrices
-  expect_equal(nrow(result$allocation_matrix), result$model_info$processed_data$N)
-  expect_equal(ncol(result$dictionary_matrix), result$model_info$processed_data$P)
+  expect_equal(nrow(get_chain(result)$map_allocation_matrix), result$model_info$processed_data$N)
+  expect_equal(ncol(get_chain(result)$map_dictionary_matrix), result$model_info$processed_data$P)
 })
 
 test_that("convergence information is available", {
   result <- load_example_results()
   
   # Check convergence info if available
-  if ("convergence" %in% names(result)) {
-    conv <- result$convergence
+  if ("convergence" %in% names(get_chain(result))) {
+    conv <- get_chain(result)$convergence
     expect_true(is.list(conv))
     
     if ("gap_converged" %in% names(conv)) {
@@ -279,8 +269,8 @@ test_that("diagnostics information is available", {
   result <- load_example_results()
   
   # Check diagnostics info if available
-  if ("diagnostics" %in% names(result)) {
-    diag <- result$diagnostics
+  if ("diagnostics" %in% names(get_chain(result))) {
+    diag <- get_chain(result)$diagnostics
     expect_true(is.list(diag))
     
     # Check for common diagnostic fields

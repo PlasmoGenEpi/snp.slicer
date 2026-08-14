@@ -7,10 +7,12 @@
 calculate_allele_frequencies(
   results,
   snp_indices,
-  use_map = TRUE,
+  estimate = c("final_sample", "map", "posterior"),
   n_samples = 100,
   interval = 0.95,
-  allele_sep = "|"
+  allele_sep = "|",
+  additional_burnin = 0,
+  chain = NULL
 )
 }
 \arguments{
@@ -18,18 +20,34 @@ calculate_allele_frequencies(
 
 \item{snp_indices}{A vector of SNP indices to treat as a single allele}
 
-\item{use_map}{Logical, whether to use MAP estimates (TRUE) or sample from MCMC (FALSE)}
+\item{estimate}{Which estimate to report. One of \code{"final_sample"} (the
+final sample of the chain, matching the SNP-Slice paper; the default),
+\code{"map"} (the maximum a posteriori state), or \code{"posterior"}
+(posterior mean, SD, and credible interval over retained MCMC samples).
+\code{"final_sample"} and \code{"map"} are point estimates; only
+\code{"posterior"} needs \code{store_mcmc = TRUE}.}
 
-\item{n_samples}{Number of MCMC samples to use if use_map = FALSE (default: 100)}
+\item{n_samples}{Number of MCMC samples to use when
+\code{estimate = "posterior"} (default: 100)}
 
-\item{interval}{Numeric in (0, 1). Credible interval width when using MCMC (e.g. 0.95).}
+\item{interval}{Numeric in (0, 1). Credible interval width when
+\code{estimate = "posterior"} (e.g. 0.95).}
 
 \item{allele_sep}{Separator for allele strings (default: "|")}
+
+\item{additional_burnin}{Number of additional stored samples to discard from
+the start of the retained chain. The retained chain is already
+post-burn-in, so this defaults to 0.}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 }
 \value{
-The structure depends on \code{use_map}. \describe{
-\item{MAP (\code{use_map = TRUE})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele in the MAP allocation), \code{total_parasites} (total parasites in the MAP allocation; same for every row).}
-\item{MCMC (\code{use_map = FALSE})}{Data frame with columns: \code{allele}, \code{frequency} (posterior mean proportion), \code{frequency_sd} (posterior SD of proportion across samples), \code{frequency_lower} and \code{frequency_upper} (credible interval, e.g. 2.5\\% and 97.5\\%), \code{mean_count} (mean parasites with this allele per MCMC sample; does not scale with \code{n_samples}), \code{n_samples}. Attribute \code{mean_total_parasites}: mean total parasites per MCMC sample (same for all alleles).}
+The structure depends on \code{estimate}. \describe{
+\item{Point estimate (\code{"final_sample"} or \code{"map"})}{Data frame with columns: \code{allele} (string representation of the allele, e.g. \code{"ref|alt|ref"} for 3 SNPs), \code{frequency} (proportion of total parasites with this allele; sums to 1), \code{count} (number of parasites with this allele), \code{total_parasites} (total parasites; same for every row).}
+\item{Posterior (\code{"posterior"})}{Data frame with columns: \code{allele}, \code{frequency} (posterior mean proportion), \code{frequency_sd} (posterior SD of proportion across samples), \code{frequency_lower} and \code{frequency_upper} (credible interval, e.g. 2.5\% and 97.5\%), \code{mean_count} (mean parasites with this allele per MCMC sample; does not scale with \code{n_samples}), \code{n_samples}. Attribute \code{mean_total_parasites}: mean total parasites per MCMC sample (same for all alleles).}
 }
 }
 \description{
@@ -38,7 +56,7 @@ The function takes SNP indices and calculates the frequency of each possible
 allele combination across all individuals based on their strain allocations.
 }
 \details{
-With \code{use_map = FALSE}, counts are summarized as per-sample means rather than sums,
+With \code{estimate = "posterior"}, counts are summarized as per-sample means rather than sums,
 so \code{mean_count} and \code{mean_total_parasites} are interpretable regardless of \code{n_samples}.
 Frequency uncertainty (\code{frequency_sd}, \code{frequency_lower}, \code{frequency_upper}) is
 computed from the distribution of allele frequencies across MCMC samples.
@@ -47,13 +65,13 @@ computed from the distribution of allele frequencies across MCMC samples.
 # Load example results
 result <- load_example_results()
 
-# Calculate allele frequencies for SNPs 1, 5, and 10 (MAP)
+# Calculate allele frequencies for SNPs 1, 5, and 10 (final sample)
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 print(allele_freqs)
 
-# With MCMC: posterior mean, SD, credible interval, and per-sample mean count
-if (!is.null(result$mcmc_samples)) {
-  allele_freqs_mcmc <- calculate_allele_frequencies(result, c(1, 5, 10), use_map = FALSE, n_samples = 50)
-  print(allele_freqs_mcmc)
+# Posterior: mean, SD, credible interval, and per-sample mean count
+if (!is.null(get_chain(result)$mcmc_samples)) {
+  allele_freqs_post <- calculate_allele_frequencies(result, c(1, 5, 10), estimate = "posterior", n_samples = 50)
+  print(allele_freqs_post)
 }
 }

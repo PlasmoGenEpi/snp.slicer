@@ -105,6 +105,6 @@ test_that("snp_slice runs end-to-end with a monomorphic locus present", {
     target_value = c("A",  "T",  "G",  "A",  "T",  "G"),
     target_count = c(5,    3,    9,    4,    6,    7)
   )
-  result <- snp_slice(df, model = "negative_binomial", n_mcmc = 25, verbose = FALSE)
+  result <- snp_slice(df, model = "negative_binomial", n_sample = 25, verbose = FALSE)
   expect_s3_class(result, "snp_slice_results")
 })

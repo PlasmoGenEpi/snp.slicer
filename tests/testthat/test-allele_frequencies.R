@@ -6,8 +6,13 @@ make_allele_freq_result <- function() {
   D <- matrix(c(1L, 0L, 0L, 0L, 1L, 1L, 0L, 1L, 0L), nrow = 3, ncol = 3)  # 3 strains, 3 SNPs
   P <- ncol(D)
   list(
-    allocation_matrix = A,
-    dictionary_matrix = D,
+    map_allocation_matrix = A,
+    map_dictionary_matrix = D,
+    # Default to a final sample identical to the MAP so that value-based tests
+    # using the default estimate are unaffected; tests that need them to differ
+    # override these fields.
+    final_allocation_matrix = A,
+    final_dictionary_matrix = D,
     model_info = list(
       model = "negative_binomial",
       N = 2,
@@ -55,20 +60,37 @@ test_that("calculate_allele_frequencies errors on invalid inputs", {
   result <- make_allele_freq_result()
   expect_error(calculate_allele_frequencies(result, integer(0)), "non-empty")
   expect_error(calculate_allele_frequencies(result, c(1L, 1L)), "unique")
-  ncol_d <- ncol(result$dictionary_matrix)
+  ncol_d <- ncol(result$map_dictionary_matrix)
   expect_error(calculate_allele_frequencies(result, c(1L, ncol_d + 1L)), "valid SNP positions")
 })
 
-test_that("calculate_allele_frequencies with use_map = FALSE when MCMC samples exist", {
+test_that("calculate_allele_frequencies with estimate = 'final_sample' uses the final matrices", {
+  result <- make_allele_freq_result()
+  # A final sample that differs from the MAP: shift a host onto another strain
+  result$final_allocation_matrix <- matrix(c(2, 0, 0, 1, 1, 1), nrow = 2, ncol = 3)
+
+  final_df <- calculate_allele_frequencies(result, c(1L, 2L, 3L), estimate = "final_sample")
+  map_df <- calculate_allele_frequencies(result, c(1L, 2L, 3L), estimate = "map")
+
+  # final sample is the default
+  expect_equal(final_df, calculate_allele_frequencies(result, c(1L, 2L, 3L)))
+  # same column shape as MAP
+  expect_equal(sort(colnames(final_df)), sort(colnames(map_df)))
+  expect_equal(sort(colnames(final_df)), sort(c("allele", "frequency", "count", "total_parasites")))
+  # the two point estimates disagree because the allocations differ
+  expect_false(isTRUE(all.equal(final_df, map_df)))
+})
+
+test_that("calculate_allele_frequencies with estimate = 'posterior' when MCMC samples exist", {
   result <- make_allele_freq_result()
   result$mcmc_samples <- list(
-    list(A = result$allocation_matrix, D = result$dictionary_matrix),
-    list(A = result$allocation_matrix, D = result$dictionary_matrix),
-    list(A = result$allocation_matrix, D = result$dictionary_matrix),
-    list(A = result$allocation_matrix, D = result$dictionary_matrix),
-    list(A = result$allocation_matrix, D = result$dictionary_matrix)
+    list(A = result$map_allocation_matrix, D = result$map_dictionary_matrix),
+    list(A = result$map_allocation_matrix, D = result$map_dictionary_matrix),
+    list(A = result$map_allocation_matrix, D = result$map_dictionary_matrix),
+    list(A = result$map_allocation_matrix, D = result$map_dictionary_matrix),
+    list(A = result$map_allocation_matrix, D = result$map_dictionary_matrix)
   )
-  freq_df <- calculate_allele_frequencies(result, c(1L, 2L), use_map = FALSE, n_samples = 5)
+  freq_df <- calculate_allele_frequencies(result, c(1L, 2L), estimate = "posterior", n_samples = 5)
   expect_s3_class(freq_df, "data.frame")
   mcmc_cols <- c("allele", "frequency", "frequency_sd", "frequency_lower", "frequency_upper", "mean_count", "n_samples")
   expect_equal(sort(colnames(freq_df)), sort(mcmc_cols))

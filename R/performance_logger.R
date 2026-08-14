@@ -85,10 +85,13 @@ clear_performance_log <- function() {
 
 #' Print performance summary
 #'
+#' @param summary Performance summary data frame. Defaults to the log of the
+#'   current process; pass a chain's stored \code{performance} table when the
+#'   chain ran in a separate process.
+#'
 #' @export
-print_performance_summary <- function() {
-  summary <- get_performance_summary()
-  if (nrow(summary) == 0) {
+print_performance_summary <- function(summary = get_performance_summary()) {
+  if (is.null(summary) || nrow(summary) == 0) {
     cat("No performance data available\n")
     return()
   }

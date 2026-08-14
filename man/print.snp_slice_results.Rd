@@ -4,10 +4,15 @@
 \alias{print.snp_slice_results}
 \title{Print SNP-Slice results}
 \usage{
-\method{print}{snp_slice_results}(x, ...)
+\method{print}{snp_slice_results}(x, chain = NULL, ...)
 }
 \arguments{
 \item{x}{SNP-Slice results object}
+
+\item{chain}{Which chain of a multi-chain run to use. \code{NULL} (default)
+uses the top-level estimates, i.e. the chain with the highest MAP log
+posterior (\code{results$best_chain}). Give an index to analyse a specific
+chain instead; see \code{\link{compare_chains}}.}
 
 \item{...}{Additional arguments}
 }

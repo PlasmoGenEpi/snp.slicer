@@ -11,12 +11,14 @@
 snp_slice(
   data,
   model = "negative_binomial",
-  n_mcmc = 10000,
-  burnin = NULL,
+  n_sample = 10000,
+  n_burnin = NULL,
   alpha = 2.6,
   rho = if (model == "categorical") 0.5 else NULL,
   threshold = 0.001,
   gap = NULL,
+  n_chains = 1,
+  n_cores = 1,
   seed = NULL,
   verbose = TRUE,
   log_performance = FALSE,
@@ -44,9 +46,12 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 \item{model}{Observation model to use. Options: "categorical", "poisson", "binomial",
 "negative_binomial" (default).}
 
-\item{n_mcmc}{Number of MCMC iterations (default: 10000).}
+\item{n_sample}{Number of post-burn-in iterations to retain (default: 10000).
+Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
+iterations in total and only the last \code{n_sample} are retained.}
 
-\item{burnin}{Burn-in period. If NULL, defaults to n_mcmc/2.}
+\item{n_burnin}{Number of iterations discarded before sampling begins. If
+NULL, defaults to \code{floor(n_sample / 2)}.}
 
 \item{alpha}{IBP concentration parameter (default: 2.6).}
 
@@ -54,15 +59,26 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 
 \item{threshold}{Threshold for identifying single infections (default: 0.001).}
 
-\item{gap}{Early stopping threshold. If NULL, runs for full n_mcmc iterations.}
+\item{gap}{Early stopping threshold. If NULL, runs for all
+\code{n_burnin + n_sample} iterations.}
 
-\item{seed}{Random seed for reproducibility.}
+\item{n_chains}{Number of independent MCMC chains to run (default: 1). Each
+chain is seeded separately; the chain reaching the highest MAP log
+posterior supplies the top-level estimates and all chains are kept in
+\code{result$chains}.}
+
+\item{n_cores}{Number of cores used to run chains simultaneously
+(default: 1, i.e. chains run sequentially). Capped at \code{n_chains}.}
+
+\item{seed}{Random seed for reproducibility. Per-chain seeds are based on
+this seed, so a full multi-chain run is reproducible.}
 
 \item{verbose}{Whether to print progress information (default: TRUE).}
 
 \item{log_performance}{Whether to log performance metrics (default: FALSE).}
 
-\item{store_mcmc}{Whether to store full MCMC samples (default: FALSE).}
+\item{store_mcmc}{Whether to store full MCMC samples (default: FALSE).
+Only post-burn-in iterations are stored.}
 
 \item{...}{Additional model-specific parameters.}
 
@@ -73,13 +89,20 @@ inputs (e.g. \code{*_cat.txt}) remain supported.}
 \value{
 An object of class \code{snp_slice_results} containing:
 \itemize{
-\item \code{allocation_matrix}: Binary allocation matrix (A)
-\item \code{dictionary_matrix}: Binary dictionary matrix (D)
-\item \code{mcmc_samples}: MCMC samples (if store_mcmc = TRUE)
-\item \code{diagnostics}: Convergence diagnostics
-\item \code{parameters}: Model parameters used
+\item \code{chains}: Per-chain results, all stored the same way. Each holds that
+chain's MAP estimate (\code{map_allocation_matrix} (A), \code{map_dictionary_matrix}
+(D)) and final-sample estimate (\code{final_allocation_matrix},
+\code{final_dictionary_matrix}), plus \code{mcmc_samples} (if store_mcmc = TRUE),
+\code{diagnostics}, \code{convergence}, and \code{seed}
+\item \code{best_chain}: Index of the chain with the highest MAP log posterior
+\item \code{parameters}: MCMC settings used
 \item \code{model_info}: Model specification
 }
+
+The object holds no estimates of its own. Reach a chain's estimates with
+\code{\link[=get_chain]{get_chain()}}, which defaults to the best chain, or with
+\code{\link[=extract_allocations]{extract_allocations()}} / \code{\link[=extract_strains]{extract_strains()}}; every diagnostic function
+also takes a \code{chain} argument. \code{\link[=compare_chains]{compare_chains()}} summarises all chains.
 }
 \description{
 SNP-Slice is a Bayesian nonparametric method for resolving multi-strain infections
@@ -94,7 +117,7 @@ data <- list(
   read0 = matrix(c(90, 95, 85, 92), nrow = 2)
 )
 
-result <- snp_slice(data, model = "negative_binomial", n_mcmc = 1000)
+result <- snp_slice(data, model = "negative_binomial", n_sample = 1000)
 
 # Extract results
 strains <- extract_strains(result)
