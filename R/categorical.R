@@ -29,6 +29,21 @@ categorical_prop_bin <- function(prop) {
   }
 }
 
+#' Vectorised form of [categorical_prop_bin()]
+#'
+#' The exception detector in [categorical_resolve_exceptions()] must classify
+#' proportions exactly as the likelihood does, so both call into the same bin
+#' edges. Keeping a separate scalar and matrix form is deliberate: the scalar
+#' one is called per-cell in the likelihood's inner loop.
+#'
+#' @param prop Numeric vector or matrix of proportions.
+#' @return Integer object of the same shape, with values 1, 2 or 3.
+#' @keywords internal
+categorical_prop_bin_vec <- function(prop) {
+  out <- ifelse(prop <= 0, 1L, ifelse(prop <= 0.99, 2L, 3L))
+  if (is.matrix(prop)) matrix(out, nrow = nrow(prop), ncol = ncol(prop)) else out
+}
+
 #' Map observation to lookup-table column (1-based)
 #' @keywords internal
 categorical_y_bin <- function(y) {
@@ -202,8 +217,11 @@ categorical_resolve_exceptions <- function(state, model_obj) {
   # Calculate current proportions
   ratios <- (state$A %*% state$D) / rowSums(state$A)
   
-  # When y == 0, cannot have proportions == 1
-  exceptions2 <- which(ratios == 1 & y == 0, arr.ind = TRUE)
+  # When y == 0, the likelihood is -Inf for any proportion in bin 3, which is
+  # `prop > 0.99` and NOT `prop == 1`. Testing equality here missed every
+  # proportion in (0.99, 1) -- e.g. 124/125 strains = 0.992 -- leaving an
+  # unfixable -Inf that made initialization fail after 10 no-op passes.
+  exceptions2 <- which(categorical_prop_bin_vec(ratios) == 3L & y == 0, arr.ind = TRUE)
   if (nrow(exceptions2) > 0) {
     state$A[exceptions2[, 1], state$kmin] <- 1
     state$D[state$kmin, exceptions2[, 2]] <- 0
@@ -212,8 +230,8 @@ categorical_resolve_exceptions <- function(state, model_obj) {
   # Recalculate ratios
   ratios <- (state$A %*% state$D) / rowSums(state$A)
   
-  # When y == 1, cannot have proportions == 0
-  exceptions1 <- which(y == 1 & ratios == 0, arr.ind = TRUE)
+  # Likewise, y == 1 is -Inf for proportion bin 1, which is `prop <= 0`.
+  exceptions1 <- which(y == 1 & categorical_prop_bin_vec(ratios) == 1L, arr.ind = TRUE)
   if (nrow(exceptions1) > 0) {
     state$A[exceptions1[, 1], state$kmin + 1] <- 1
     state$D[state$kmin + 1, exceptions1[, 2]] <- 1
