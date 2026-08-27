@@ -66,7 +66,6 @@ inline double dnbinom_log_native(double y, double r, double prop) {
          + r * std::log(p) + y * std::log(q);
 }
 
-// loglik_const_* are terms depending only on (y, r), not prop (see prepare_obs_views).
 inline double dpois_log_const(double y) {
   if (ISNA(y)) return 0.0;
   return -std::lgamma(y + 1.0);
@@ -121,7 +120,6 @@ SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double 
   }
 }
 
-// Count models with y == 0 (obs_code == 1): no ISNA check; drops y*log(q) / y*log(lambda) terms.
 SNP_SLICER_HOT double count_loglik_y0_fast(double prop, double r, double loglik_const,
                                    int model_type) {
   switch (model_type) {
