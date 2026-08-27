@@ -1,12 +1,16 @@
 // [[Rcpp::depends(RcppEigen)]]
 #include "mcmc_kernel_common.h"
 #include "mcmc_kernel_internal.h"
+#ifndef EIGEN_NO_DEBUG
+#define EIGEN_NO_DEBUG
+#endif
 #include <RcppEigen.h>
 #include <Rcpp.h>
 #include <algorithm>
 #include <vector>
 
 using snp_slicer::CATEGORICAL;
+using snp_slicer::NEGATIVE_BINOMIAL;
 using snp_slicer::mh_ratio;
 using snp_slicer::loglik_value;
 using snp_slicer::loglik_value_fast;
@@ -156,9 +160,12 @@ void update_a(SliceState& state, ModelData& model) {
 
   Eigen::Map<Eigen::MatrixXd> A_e(A.begin(), N, K);
   Eigen::Map<const Eigen::MatrixXd> D_e(D.begin(), K, P);
+  const double* D_ptr = D.begin();
 
   std::vector<double> y_row(static_cast<std::size_t>(P));
   std::vector<double> r_row(static_cast<std::size_t>(P));
+  std::vector<double> c_row(static_cast<std::size_t>(P));
+  std::vector<int> code_row(static_cast<std::size_t>(P));
   Eigen::RowVectorXd full_row(P);
 
   ColSumTracker col_tracker;
@@ -175,6 +182,7 @@ void update_a(SliceState& state, ModelData& model) {
     const int host = mixed[m] - 1;
 
     full_row = A_e.row(host) * D_e;
+    double* full_ptr = full_row.data();
     double row_sum = A_e.row(host).sum();
 
     const bool use_obs_layout =
@@ -182,7 +190,14 @@ void update_a(SliceState& state, ModelData& model) {
       obs.has_loglik_const() &&
       obs.has_obs_code();
 
-    if (!use_obs_layout) {
+    if (use_obs_layout) {
+      for (int p = 0; p < P; ++p) {
+        y_row[static_cast<std::size_t>(p)] = obs.y_at(host, p);
+        r_row[static_cast<std::size_t>(p)] = obs.r_at(host, p);
+        c_row[static_cast<std::size_t>(p)] = obs.loglik_const_at(host, p);
+        code_row[static_cast<std::size_t>(p)] = obs.obs_code_at(host, p);
+      }
+    } else {
       for (int p = 0; p < P; ++p) {
         y_row[static_cast<std::size_t>(p)] = obs.y_at(host, p);
         r_row[static_cast<std::size_t>(p)] = obs.r_at(host, p);
@@ -218,8 +233,8 @@ void update_a(SliceState& state, ModelData& model) {
           if (obs.has_obs_code() && obs.obs_code_at(host, p) == OBS_SKIP) {
             continue;
           }
-          const double d_kp = D_e(k_idx, p);
-          const double ad0 = full_row(p) - old_a * d_kp;
+          const double d_kp = D_ptr[k_idx + p * K];
+          const double ad0 = full_ptr[p] - old_a * d_kp;
           const double prop0 = ad0 / a0;
           const double prop1 = (ad0 + d_kp) / (a0 + 1.0);
           const double yp = obs.has_obs_code()
@@ -228,33 +243,59 @@ void update_a(SliceState& state, ModelData& model) {
           logp0 += loglik_categorical_value(yp, prop0, obs.llik_tab, obs.llik_tab_nrow);
           logp1 += loglik_categorical_value(yp, prop1, obs.llik_tab, obs.llik_tab_nrow);
         }
-      } else if (use_obs_layout) {
+      } else if (use_obs_layout && model.model_type == NEGATIVE_BINOMIAL) {
         const double inv_a0 = 1.0 / a0;
         const double inv_a1 = 1.0 / (a0 + 1.0);
         for (int p = 0; p < P; ++p) {
-          const int code = obs.obs_code_at(host, p);
+          const int code = code_row[static_cast<std::size_t>(p)];
           if (code == OBS_SKIP) continue;
-          const double d_kp = D_e(k_idx, p);
-          const double ad0 = full_row(p) - old_a * d_kp;
+          const double d_kp = D_ptr[k_idx + p * K];
+          const double ad0 = full_ptr[p] - old_a * d_kp;
           const double prop0 = ad0 * inv_a0;
           const double prop1 = (ad0 + d_kp) * inv_a1;
-          const double c = obs.loglik_const_at(host, p);
-          const double rp = obs.r_at(host, p);
+          const double c = c_row[static_cast<std::size_t>(p)];
+          const double rp = r_row[static_cast<std::size_t>(p)];
           if (code == OBS_Y_ZERO) {
-            logp0 += count_loglik_y0_fast(prop0, rp, c, model.model_type);
-            logp1 += count_loglik_y0_fast(prop1, rp, c, model.model_type);
+            const double p0 = 1.0 / (1.0 + prop0);
+            const double p1 = 1.0 / (1.0 + prop1);
+            logp0 += c + rp * std::log(p0);
+            logp1 += c + rp * std::log(p1);
           } else {
-            const double yp = obs.y_at(host, p);
-            logp0 += loglik_value_fast(prop0, yp, rp, c, model.model_type);
-            logp1 += loglik_value_fast(prop1, yp, rp, c, model.model_type);
+            const double yp = y_row[static_cast<std::size_t>(p)];
+            const double p0 = 1.0 / (1.0 + prop0);
+            const double p1 = 1.0 / (1.0 + prop1);
+            logp0 += c + rp * std::log(p0) + yp * std::log(1.0 - p0);
+            logp1 += c + rp * std::log(p1) + yp * std::log(1.0 - p1);
+          }
+        }
+      } else if (use_obs_layout) {
+        const double inv_a0 = 1.0 / a0;
+        const double inv_a1 = 1.0 / (a0 + 1.0);
+        const int model_type = model.model_type;
+        for (int p = 0; p < P; ++p) {
+          const int code = code_row[static_cast<std::size_t>(p)];
+          if (code == OBS_SKIP) continue;
+          const double d_kp = D_ptr[k_idx + p * K];
+          const double ad0 = full_ptr[p] - old_a * d_kp;
+          const double prop0 = ad0 * inv_a0;
+          const double prop1 = (ad0 + d_kp) * inv_a1;
+          const double c = c_row[static_cast<std::size_t>(p)];
+          const double rp = r_row[static_cast<std::size_t>(p)];
+          if (code == OBS_Y_ZERO) {
+            logp0 += count_loglik_y0_fast(prop0, rp, c, model_type);
+            logp1 += count_loglik_y0_fast(prop1, rp, c, model_type);
+          } else {
+            const double yp = y_row[static_cast<std::size_t>(p)];
+            logp0 += loglik_value_fast(prop0, yp, rp, c, model_type);
+            logp1 += loglik_value_fast(prop1, yp, rp, c, model_type);
           }
         }
       } else {
         const double inv_a0 = 1.0 / a0;
         const double inv_a1 = 1.0 / (a0 + 1.0);
         for (int p = 0; p < P; ++p) {
-          const double d_kp = D_e(k_idx, p);
-          const double ad0 = full_row(p) - old_a * d_kp;
+          const double d_kp = D_ptr[k_idx + p * K];
+          const double ad0 = full_ptr[p] - old_a * d_kp;
           const double prop0 = ad0 * inv_a0;
           const double prop1 = (ad0 + d_kp) * inv_a1;
           const double yp = y_row[static_cast<std::size_t>(p)];

@@ -8,11 +8,17 @@
 #include <functional>
 #include <vector>
 
+#if defined(__clang__) || defined(__GNUC__)
+#define SNP_SLICER_HOT inline __attribute__((always_inline))
+#else
+#define SNP_SLICER_HOT inline
+#endif
+
 namespace snp_slicer {
 
 enum ModelType { POISSON = 0, BINOMIAL = 1, NEGATIVE_BINOMIAL = 2, CATEGORICAL = 3 };
 
-inline double mh_ratio(double logp1, double logp0) {
+SNP_SLICER_HOT double mh_ratio(double logp1, double logp0) {
   if (!R_finite(logp1)) return 0.0;
   if (!R_finite(logp0)) return 1.0;
   const double maxlogp = std::max(logp1, logp0);
@@ -76,14 +82,14 @@ inline double dnbinom_log_const(double y, double r) {
   return std::lgamma(y + r) - std::lgamma(r) - std::lgamma(y + 1.0);
 }
 
-inline double dpois_log_fast(double prop, double r, double y, double loglik_const) {
+SNP_SLICER_HOT double dpois_log_fast(double prop, double r, double y, double loglik_const) {
   if (ISNA(y)) return 0.0;
   const double lambda = r * prop;
   if (lambda <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
   return loglik_const + y * std::log(lambda) - lambda;
 }
 
-inline double dbinom_log_fast(double prop, double n, double y, double loglik_const) {
+SNP_SLICER_HOT double dbinom_log_fast(double prop, double n, double y, double loglik_const) {
   if (ISNA(y)) return 0.0;
   if (prop < 0.0 || prop > 1.0 || n < 0.0) return R_NegInf;
   if (y < 0.0 || y > n) return R_NegInf;
@@ -94,14 +100,14 @@ inline double dbinom_log_fast(double prop, double n, double y, double loglik_con
   return loglik_const + y * std::log(p) + (n - y) * std::log(q);
 }
 
-inline double dnbinom_log_fast(double prop, double r, double y, double loglik_const) {
+SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double loglik_const) {
   if (ISNA(y)) return 0.0;
   const double p = 1.0 / (1.0 + prop);
   const double q = 1.0 - p;
   return loglik_const + r * std::log(p) + y * std::log(q);
 }
 
-inline double loglik_value_fast(double prop, double y, double r, double loglik_const,
+SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double loglik_const,
                                 int model_type) {
   switch (model_type) {
   case POISSON:
@@ -116,7 +122,7 @@ inline double loglik_value_fast(double prop, double y, double r, double loglik_c
 }
 
 // Count models with y == 0 (obs_code == 1): no ISNA check; drops y*log(q) / y*log(lambda) terms.
-inline double count_loglik_y0_fast(double prop, double r, double loglik_const,
+SNP_SLICER_HOT double count_loglik_y0_fast(double prop, double r, double loglik_const,
                                    int model_type) {
   switch (model_type) {
   case POISSON: {
@@ -153,7 +159,7 @@ inline double loglik_value(double y, double r, double prop, int model_type) {
   }
 }
 
-inline double loglik_categorical_value(double y, double prop,
+SNP_SLICER_HOT double loglik_categorical_value(double y, double prop,
                                        const double* llik_tab, int llik_tab_nrow) {
   const int pb = prop_bin(prop);
   const int yb = y_bin(y);
