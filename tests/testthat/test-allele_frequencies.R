@@ -143,3 +143,53 @@ test_that("calculate_allele_frequencies_by_sets errors on invalid target_sets", 
     "non-empty vector"
   )
 })
+
+# Regression: the dictionary-to-allele-label lookup is indexed by D + 1, and the
+# two model families assign the slots in opposite directions. Count models put
+# the minor allele in slot 1 and set D to 1 for it, so D == 0 denotes r1. The
+# categorical model encodes slot 1 as observation 0, so D == 0 denotes r0.
+make_slot_result <- function(model) {
+  # One host carrying one strain; that strain is 0 at the single SNP.
+  A <- matrix(1L, nrow = 1, ncol = 1)
+  D <- matrix(0L, nrow = 1, ncol = 1)
+  list(
+    map_allocation_matrix = A,
+    map_dictionary_matrix = D,
+    final_allocation_matrix = A,
+    final_dictionary_matrix = D,
+    model_info = list(
+      model = model,
+      N = 1,
+      P = 1,
+      data_type = if (model == "categorical") "categorical" else "read_counts",
+      processed_data = list(
+        target_ids = "target_1",
+        r0_values = "slot1",
+        r1_values = "slot2"
+      )
+    )
+  ) |> structure(class = "snp_slice_results")
+}
+
+test_that("a count-model dictionary entry of 0 is labelled with the slot-2 allele", {
+  af <- calculate_allele_frequencies(make_slot_result("negative_binomial"), 1)
+  top <- af[af$frequency > 0, ]
+  expect_equal(nrow(top), 1L)
+  expect_equal(top$allele, "slot2")
+})
+
+test_that("a categorical dictionary entry of 0 is labelled with the slot-1 allele", {
+  af <- calculate_allele_frequencies(make_slot_result("categorical"), 1)
+  top <- af[af$frequency > 0, ]
+  expect_equal(nrow(top), 1L)
+  expect_equal(top$allele, "slot1")
+})
+
+test_that("the two model families label the same dictionary in opposite directions", {
+  count_af <- calculate_allele_frequencies(make_slot_result("poisson"), 1)
+  cat_af <- calculate_allele_frequencies(make_slot_result("categorical"), 1)
+  expect_false(identical(
+    count_af$allele[count_af$frequency > 0],
+    cat_af$allele[cat_af$frequency > 0]
+  ))
+})
