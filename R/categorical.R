@@ -44,6 +44,44 @@ categorical_prop_bin_vec <- function(prop) {
   if (is.matrix(prop)) matrix(out, nrow = nrow(prop), ncol = ncol(prop)) else out
 }
 
+#' Strains a host could plausibly be carrying, given its own calls
+#'
+#' A mixed host used to be initialized carrying every strain in the dictionary.
+#' That is not a biological state -- on a 400-specimen panel it starts hosts at a
+#' COI of ~289 -- and it manufactures likelihood exceptions that cannot be
+#' repaired. `llik_tab` is `-Inf` at [prop bin 3, y == 0], bin 3 being
+#' `prop > 0.99`; a host carrying all K strains at a locus where K-1 of them
+#' carry the alternate sits at `(K-1)/K`, which is inside bin 3 once K > 100.
+#' [categorical_resolve_exceptions()] repairs such a cell by adding a single
+#' reference-carrying strain, which only reaches bin 2 when K <= 100, so above
+#' that the repair is arithmetically incapable of clearing the exception and
+#' initialization aborts at the iteration cap.
+#'
+#' Restricting a host to the strains that match its own homozygous calls fixes
+#' this at the source: at every locus called 0 or 1 the host then carries only
+#' strains with that allele, so the proportion is exactly 0 or 1 and lands in the
+#' bin the observation agrees with. Heterozygous and missing loci are left
+#' unconstrained, since any mixture is consistent with them.
+#'
+#' The result is never empty: the dictionary is built by de-duplicating the
+#' hosts' own resolved genotypes, so a host's own strain always matches it at
+#' every homozygous locus. `fallback` guards the degenerate case anyway.
+#'
+#' @param y_row Observed calls for one host (0, 1, 0.5 or NA per locus).
+#' @param D Strain dictionary, strains in rows.
+#' @param fallback Strain index to use if nothing matches.
+#' @return Integer vector of strain indices.
+#' @keywords internal
+categorical_compatible_strains <- function(y_row, D, fallback) {
+  observed <- which(!is.na(y_row) & (y_row == 0 | y_row == 1))
+  if (length(observed) == 0L) {
+    return(seq_len(nrow(D)))
+  }
+  keep <- which(apply(D[, observed, drop = FALSE], 1L,
+                      function(d) all(d == y_row[observed])))
+  if (length(keep) == 0L) fallback else keep
+}
+
 #' Map observation to lookup-table column (1-based)
 #' @keywords internal
 categorical_y_bin <- function(y) {
@@ -151,9 +189,12 @@ categorical_initialize_state <- function(model_obj, threshold = 0.001) {
     which_mixed <- c(which(!is_single), which(is.na(is_single)))
     nsinglestrain <- length(unique(assignments[which_single]))
     
-    # Assign mixed infections to all strains
-    state$A[which_mixed, ] <- 1
-    
+    # Assign mixed infections to the strains compatible with their own calls
+    for (imixed in which_mixed) {
+      state$A[imixed, categorical_compatible_strains(y[imixed, ], state$D,
+                                                     assignments[imixed])] <- 1
+    }
+
     # Assign single infections to specific strains
     for (isingle in 1:nsingleppl) {
       state$A[which_single[isingle], assignments[which_single[isingle]]] <- 1
@@ -187,7 +228,10 @@ categorical_initialize_state <- function(model_obj, threshold = 0.001) {
     # All mixed infections
     state$mixed <- 1:N
     state$kmin <- 1
-    state$A[state$mixed, ] <- 1
+    for (imixed in state$mixed) {
+      state$A[imixed, categorical_compatible_strains(y[imixed, ], state$D,
+                                                     assignments[imixed])] <- 1
+    }
     state$loglik <- categorical_loglikelihood_matrix(state$A, state$D, model_obj)
     
     # Resolve exceptions
