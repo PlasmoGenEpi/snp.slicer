@@ -33,7 +33,10 @@ Imports:
     parallel,
     posterior,
     readr,
+    Rcpp,
     tidyr
+LinkingTo: Rcpp, RcppEigen
+SystemRequirements: C++17
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests:
@@ -42,7 +45,9 @@ Suggests:
     knitr,
     rmarkdown,
     ggplot2,
-    pkgdown
+    pkgdown,
+    Rcpp,
+    RcppEigen
 VignetteBuilder: knitr
 URL: https://github.com/plasmogenepi/snp.slicer, https://plasmogenepi.github.io/snp.slicer/
 BugReports: https://github.com/plasmogenepi/snp.slicer/issues

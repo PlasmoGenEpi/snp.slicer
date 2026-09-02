@@ -301,9 +301,24 @@ load_dataframe <- function(
 
   # Order alleles per target, remove loci with more than two alleles, 
   # and assign target indices
-  target_alleles <- data_renamed |>
+  allele_counts_per_target <- data_renamed |>
     dplyr::group_by(target_id, target_value) |>
-    dplyr::summarize(total_count = sum(target_count), .groups = "drop") |>
+    dplyr::summarize(total_count = sum(target_count), .groups = "drop")
+
+  polyallelic <- allele_counts_per_target |>
+    dplyr::count(target_id) |>
+    dplyr::filter(.data$n > 2) |>
+    dplyr::pull("target_id")
+  if (length(polyallelic) > 0) {
+    warning(
+      "Dropping ", length(polyallelic),
+      " target(s) with more than two alleles: ",
+      paste(polyallelic, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  target_alleles <- allele_counts_per_target |>
     dplyr::group_by(target_id) |>
     dplyr::filter(dplyr::n() <= 2) |>
     dplyr::arrange(
@@ -801,7 +816,7 @@ calculate_allele_frequencies <- function(results, snp_indices, estimate = c("fin
     matrices <- point_estimate_matrices(results, estimate)
     A <- matrices$A
     D <- matrices$D
-    allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep)
+    allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model)
     total_parasites <- sum(allele_counts$count)
     result_df <- data.frame(
       allele = allele_counts$allele,
@@ -824,7 +839,7 @@ calculate_allele_frequencies <- function(results, snp_indices, estimate = c("fin
     sample_indices <- sample(seq_len(n_total_samples), n_samples, replace = FALSE)
     allele_counts_list <- lapply(sample_indices, function(i) {
       sample_data <- samples[[i]]
-      calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep)
+      calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model)
     })
     result_df <- summarize_allele_frequencies_mcmc(allele_counts_list, interval = interval, n_samples = n_samples)
   }
@@ -938,12 +953,20 @@ summarize_allele_frequencies_mcmc <- function(allele_counts_list, interval = 0.9
 
 #' Calculate allele counts for a single sample
 #' @keywords internal
-calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_values, sep = "|") {
-  
+calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_values, sep = "|", model = NULL) {
+
   n_snps <- length(snp_indices)
   n_strains <- nrow(D)
   n_individuals <- nrow(A)
-  rs <- Map(c, r1_values, r0_values)
+  # rs[[j]] is indexed by D + 1, so its first element is the allele that a
+  # dictionary entry of 0 denotes. Count models place the minor allele in slot 1
+  # and set D to 1 for it, so 0 denotes the slot-2 allele (r1). The categorical
+  # model encodes slot 1 as observation 0, so there 0 denotes r0.
+  rs <- if (identical(model, "categorical")) {
+    Map(c, r0_values, r1_values)
+  } else {
+    Map(c, r1_values, r0_values)
+  }
   
   # Get the SNP values for each strain at the specified indices
   strain_snps <- D[, snp_indices, drop = FALSE]

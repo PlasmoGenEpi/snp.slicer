@@ -108,3 +108,38 @@ test_that("snp_slice runs end-to-end with a monomorphic locus present", {
   result <- snp_slice(df, model = "negative_binomial", n_sample = 25, verbose = FALSE)
   expect_s3_class(result, "snp_slice_results")
 })
+
+test_that("load_dataframe warns with the target ids it drops for having >2 alleles", {
+  # t1 biallelic (A/T), t2 triallelic (A/C/G), t3 triallelic (A/C/G).
+  df <- data.frame(
+    specimen_id  = rep(c("s1", "s2", "s3"), each = 3),
+    target_id    = rep(c("t1", "t2", "t3"), times = 3),
+    target_value = c("A", "A", "A",
+                     "T", "C", "C",
+                     "A", "G", "G"),
+    target_count = c(5, 4, 6, 3, 7, 2, 8, 5, 9)
+  )
+  expect_warning(
+    out <- snp.slicer:::load_dataframe(df, model = "negative_binomial"),
+    "more than two alleles"
+  )
+  w <- tryCatch(
+    snp.slicer:::load_dataframe(df, model = "negative_binomial"),
+    warning = function(w) conditionMessage(w)
+  )
+  expect_match(w, "t2")
+  expect_match(w, "t3")
+  expect_false(grepl("t1", w))
+  # The dropped targets are absent from the loaded data.
+  expect_setequal(out$target_ids, "t1")
+})
+
+test_that("load_dataframe stays silent when every target is biallelic", {
+  df <- data.frame(
+    specimen_id  = rep(c("s1", "s2"), each = 2),
+    target_id    = rep(c("t1", "t2"), times = 2),
+    target_value = c("A", "C", "T", "G"),
+    target_count = c(5, 3, 4, 6)
+  )
+  expect_no_warning(snp.slicer:::load_dataframe(df, model = "negative_binomial"))
+})
