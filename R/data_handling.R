@@ -301,9 +301,24 @@ load_dataframe <- function(
 
   # Order alleles per target, remove loci with more than two alleles, 
   # and assign target indices
-  target_alleles <- data_renamed |>
+  allele_counts_per_target <- data_renamed |>
     dplyr::group_by(target_id, target_value) |>
-    dplyr::summarize(total_count = sum(target_count), .groups = "drop") |>
+    dplyr::summarize(total_count = sum(target_count), .groups = "drop")
+
+  polyallelic <- allele_counts_per_target |>
+    dplyr::count(target_id) |>
+    dplyr::filter(.data$n > 2) |>
+    dplyr::pull("target_id")
+  if (length(polyallelic) > 0) {
+    warning(
+      "Dropping ", length(polyallelic),
+      " target(s) with more than two alleles: ",
+      paste(polyallelic, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  target_alleles <- allele_counts_per_target |>
     dplyr::group_by(target_id) |>
     dplyr::filter(dplyr::n() <= 2) |>
     dplyr::arrange(
