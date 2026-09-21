@@ -6,6 +6,7 @@
 \alias{snp_slice_poisson}
 \alias{snp_slice_binomial}
 \alias{snp_slice_negative_binomial}
+\alias{snp_slice_multinomial}
 \title{Bayesian Nonparametric Resolution of Multi-Strain Infections}
 \usage{
 snp_slice(
@@ -33,6 +34,8 @@ snp_slice_poisson(data, ...)
 snp_slice_binomial(data, ...)
 
 snp_slice_negative_binomial(data, ...)
+
+snp_slice_multinomial(data, dict_prior = "empirical", ...)
 }
 \arguments{
 \item{data}{Input data. Can be a matrix, data.frame, or file path. For read count data,
@@ -44,7 +47,17 @@ alt-only -> 1, both present -> 0.5, zero total -> NA. Matrix and categorical fil
 inputs (e.g. \code{*_cat.txt}) remain supported.}
 
 \item{model}{Observation model to use. Options: "categorical", "poisson", "binomial",
-"negative_binomial" (default).}
+"negative_binomial" (default), or "multinomial". The multinomial model
+accepts targets with any number of alleles: a long-format data.frame keeps
+every allele at every target instead of dropping targets with more than
+two, each strain carries one allele per target, and read counts across
+alleles are multinomial in the fraction of a specimen's strains carrying
+each allele. On two-allele targets it coincides with the binomial model.
+Its dictionary prior is set by \code{dict_prior} (passed through
+\code{...}): \code{"empirical"} (default; pooled allele read fractions
+with a pseudocount of one), \code{"uniform"}, or a list of per-target
+probability vectors. Its allocation update runs in compiled code like the
+other models; the dictionary update is an R Gibbs step over alleles.}
 
 \item{n_sample}{Number of post-burn-in iterations to retain (default: 10000).
 Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
@@ -85,6 +98,9 @@ Only post-burn-in iterations are stored.}
 \item{e1}{Error parameter for categorical model (default: 0.05)}
 
 \item{e2}{Error parameter for categorical model (default: 0.05)}
+
+\item{dict_prior}{Dictionary prior for the multinomial model; see
+\code{model}.}
 }
 \value{
 An object of class \code{snp_slice_results} containing:

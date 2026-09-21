@@ -176,6 +176,33 @@ inline void prepare_obs_views(
 
 void update_s(SliceState& state, const ModelData& model);
 void update_a(SliceState& state, ModelData& model);
+void update_a_multinomial(SliceState& state,
+                          const Rcpp::IntegerMatrix& D_codes,
+                          const Rcpp::IntegerVector& mixed,
+                          const Rcpp::NumericMatrix& counts,
+                          const Rcpp::IntegerVector& col_offset,
+                          const Rcpp::NumericMatrix& r_totals);
+void update_s_multinomial(SliceState& state,
+                          Rcpp::IntegerMatrix& D,
+                          const Rcpp::NumericMatrix& prior_pad,
+                          const Rcpp::IntegerVector& n_alleles,
+                          double alpha);
+void update_d_multinomial(const Rcpp::NumericMatrix& A,
+                          Rcpp::IntegerMatrix& D,
+                          const Rcpp::NumericMatrix& counts,
+                          const Rcpp::IntegerVector& col_offset,
+                          const Rcpp::IntegerVector& n_alleles,
+                          const Rcpp::NumericMatrix& log_prior_pad,
+                          const Rcpp::NumericMatrix& prior_pad,
+                          int kmin,
+                          int kstar);
+double loglik_multinomial(const Rcpp::NumericMatrix& A,
+                          const Rcpp::IntegerMatrix& D,
+                          const Rcpp::NumericMatrix& counts,
+                          const Rcpp::IntegerVector& col_offset);
+double gridsample_newfeature(double lb, double ub, int N, double alpha);
+double gridsample_oldfeature(double lb, double ub, int m, int N);
+double get_mustar(const Rcpp::NumericMatrix& A, const Rcpp::NumericVector& mu);
 void update_d(SliceState& state, ModelData& model);
 void update_mu(SliceState& state, const ModelData& model);
 

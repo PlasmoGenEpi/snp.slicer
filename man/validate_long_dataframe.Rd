@@ -4,13 +4,17 @@
 \alias{validate_long_dataframe}
 \title{Structural validation for long-format data.frames}
 \usage{
-validate_long_dataframe(data, params)
+validate_long_dataframe(data, params, model = NULL)
 }
 \arguments{
 \item{data}{Long-format data.frame.}
 
 \item{params}{List of resolved column names with elements
 \code{specimen_id_col}, \code{target_id_col}, \code{target_value_col}.}
+
+\item{model}{Model name. The multinomial model keeps targets with any
+number of alleles, so it only needs one polymorphic target (two or more
+observed alleles); every other model needs a biallelic one.}
 }
 \value{
 Invisibly \code{TRUE}; otherwise throws an error.

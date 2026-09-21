@@ -13,7 +13,17 @@
 #'   alt-only -> 1, both present -> 0.5, zero total -> NA. Matrix and categorical file
 #'   inputs (e.g. \code{*_cat.txt}) remain supported.
 #' @param model Observation model to use. Options: "categorical", "poisson", "binomial",
-#'   "negative_binomial" (default).
+#'   "negative_binomial" (default), or "multinomial". The multinomial model
+#'   accepts targets with any number of alleles: a long-format data.frame keeps
+#'   every allele at every target instead of dropping targets with more than
+#'   two, each strain carries one allele per target, and read counts across
+#'   alleles are multinomial in the fraction of a specimen's strains carrying
+#'   each allele. On two-allele targets it coincides with the binomial model.
+#'   Its dictionary prior is set by \code{dict_prior} (passed through
+#'   \code{...}): \code{"empirical"} (default; pooled allele read fractions
+#'   with a pseudocount of one), \code{"uniform"}, or a list of per-target
+#'   probability vectors. Its allocation update runs in compiled code like the
+#'   other models; the dictionary update is an R Gibbs step over alleles.
 #' @param n_sample Number of post-burn-in iterations to retain (default: 10000).
 #'   Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
 #'   iterations in total and only the last \code{n_sample} are retained.
@@ -171,4 +181,12 @@ snp_slice_binomial <- function(data, ...) {
 #' @export
 snp_slice_negative_binomial <- function(data, ...) {
   snp_slice(data, model = "negative_binomial", ...)
+}
+
+#' @rdname snp_slice
+#' @param dict_prior Dictionary prior for the multinomial model; see
+#'   \code{model}.
+#' @export
+snp_slice_multinomial <- function(data, dict_prior = "empirical", ...) {
+  snp_slice(data, model = "multinomial", dict_prior = dict_prior, ...)
 }

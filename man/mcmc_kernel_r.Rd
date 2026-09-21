@@ -4,7 +4,13 @@
 \alias{mcmc_kernel_r}
 \title{R reference kernel adapter}
 \usage{
-mcmc_kernel_r()
+mcmc_kernel_r(model_obj = NULL)
+}
+\arguments{
+\item{model_obj}{Optional model object. The multinomial model has its own
+allocation and dictionary updates (integer dictionary, Gibbs over
+alleles); every other model, and a \code{NULL}, gets the binary reference
+updates.}
 }
 \description{
 R reference kernel adapter

@@ -10,8 +10,22 @@ calculate_allele_counts_single(
   snp_indices,
   r0_values,
   r1_values,
-  sep = "|"
+  sep = "|",
+  model = NULL,
+  allele_labels = NULL,
+  y_slot = 1L
 )
+}
+\arguments{
+\item{allele_labels}{Optional list, one character vector per entry of
+\code{snp_indices}, giving the label of each allele code at that target
+(multinomial model). When supplied it overrides \code{r0_values} and
+\code{r1_values}.}
+
+\item{y_slot}{For count models, the allele slot whose counts were modelled
+as \code{y}: 1 (long-format input, \code{y = read0}) or 2 (read0/read1
+list input, \code{y = read1}). A dictionary entry of 1 always means the
+strain carries the \code{y} allele, so this decides which label that is.}
 }
 \description{
 Calculate allele counts for a single sample
