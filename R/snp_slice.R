@@ -12,18 +12,11 @@
 #'   For a categorical data.frame, counts are converted to categories: ref-only -> 0,
 #'   alt-only -> 1, both present -> 0.5, zero total -> NA. Matrix and categorical file
 #'   inputs (e.g. \code{*_cat.txt}) remain supported.
-#' @param model Observation model to use. Options: "categorical", "poisson", "binomial",
-#'   "negative_binomial" (default), or "multinomial". The multinomial model
-#'   accepts targets with any number of alleles: a long-format data.frame keeps
-#'   every allele at every target instead of dropping targets with more than
-#'   two, each strain carries one allele per target, and read counts across
-#'   alleles are multinomial in the fraction of a specimen's strains carrying
-#'   each allele. On two-allele targets it coincides with the binomial model.
-#'   Its dictionary prior is set by \code{dict_prior} (passed through
-#'   \code{...}): \code{"empirical"} (default; pooled allele read fractions
-#'   with a pseudocount of one), \code{"uniform"}, or a list of per-target
-#'   probability vectors. Its allocation update runs in compiled code like the
-#'   other models; the dictionary update is an R Gibbs step over alleles.
+#' @param model Observation model to use. One of \code{"categorical"},
+#'   \code{"poisson"}, \code{"binomial"}, \code{"negative_binomial"}
+#'   (default), or \code{"multinomial"}. Only the multinomial model keeps
+#'   targets with more than two alleles; the others drop them. See
+#'   \sQuote{The multinomial model} below.
 #' @param n_sample Number of post-burn-in iterations to retain (default: 10000).
 #'   Burn-in iterations are additional: the chain runs \code{n_burnin + n_sample}
 #'   iterations in total and only the last \code{n_sample} are retained.
@@ -62,6 +55,34 @@
 #'   [get_chain()], which defaults to the best chain, or with
 #'   [extract_allocations()] / [extract_strains()]; every diagnostic function
 #'   also takes a `chain` argument. [compare_chains()] summarises all chains.
+#'
+#' @section The multinomial model:
+#' The other models describe a target with a single number per specimen: the
+#' dictionary is binary, so \code{(A \%*\% D) / rowSums(A)} gives the fraction of a
+#' specimen's strains carrying the alternate allele, and the reference allele is
+#' whatever is left over. That only works for two alleles, so targets with more
+#' are dropped.
+#'
+#' The multinomial model instead describes a target with a probability
+#' \emph{vector}, one entry per allele. The dictionary holds an allele code per
+#' strain per target rather than a bit; expanding it to one indicator column per
+#' (target, allele) pair makes each entry of
+#' \code{(A \%*\% Dx) / rowSums(A)} the fraction of a specimen's strains carrying
+#' that allele, and the entries for one target sum to one. The observed read
+#' counts across a target's alleles are then multinomial in that vector. Nothing
+#' limits the vector's length, so every allele at every target is kept.
+#'
+#' With exactly two alleles the vector is \code{(1 - p, p)} and the kernel reduces
+#' to the binomial one, so the two models agree on biallelic data.
+#'
+#' Parameters read from \code{...}: \code{dict_prior} sets the per-target
+#' categorical prior on dictionary entries, either \code{"empirical"} (default;
+#' pooled allele read fractions with a pseudocount of one), \code{"uniform"}, or
+#' a list of per-target probability vectors. \code{rho}, used by the count
+#' models, does not apply.
+#'
+#' Implementation: the allocation update runs in compiled code as for the other
+#' models, while the dictionary update is an R Gibbs step over alleles.
 #'
 #' @importFrom stats runif dpois dbinom dnbinom rbeta median
 #' @importFrom utils read.delim tail

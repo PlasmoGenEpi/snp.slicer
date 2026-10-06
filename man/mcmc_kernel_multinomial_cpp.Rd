@@ -25,8 +25,9 @@ stick-breaking steps into one call. The adapter also supplies
 coefficients.
 }
 \details{
-The adapter's name is \code{"cpp_multinomial"} rather than \code{"cpp"}:
+The adapter's name is \code{"cpp_multinomial"} rather than \code{"cpp"} which
+is the biallelic adaptor name:
 \code{slice_iter()} must not route it through the generic observation
-cache or the generic total likelihood.
+cache or the generic total likelihood but instead via the multinomial one.
 }
 \keyword{internal}

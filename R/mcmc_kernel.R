@@ -220,9 +220,10 @@ resolve_mcmc_kernel <- function(model_obj, backend = getOption("snp.slicer.mcmc_
 #' \code{loglik}, the compiled kernel term plus the model's multinomial
 #' coefficients.
 #'
-#' The adapter's name is \code{"cpp_multinomial"} rather than \code{"cpp"}:
+#' The adapter's name is \code{"cpp_multinomial"} rather than \code{"cpp"} which
+#' is the biallelic adaptor name:
 #' \code{slice_iter()} must not route it through the generic observation
-#' cache or the generic total likelihood.
+#' cache or the generic total likelihood but instead via the multinomial one.
 #'
 #' @param model_obj Multinomial model object
 #' @param fused Use the fused compiled iteration (default). With
