@@ -15,29 +15,47 @@ create_model <- function(
   
   # Extract additional parameters
   params <- list(...)
-  if (is.null(rho)) {
+  if (is.null(rho) && model != "multinomial") {
     polymorphic_obs <- !is.na(processed_data$y) & processed_data$y != processed_data$r
     rho <- sum(processed_data$y[polymorphic_obs], na.rm = TRUE) /
       sum(processed_data$r[polymorphic_obs], na.rm = TRUE)
   }
-  
+
   # Create model-specific object
-  if (model == "categorical") {
+  if (model == "multinomial") {
+    if (is.null(processed_data$counts_exp)) {
+      stop("The multinomial model needs multi-allelic processed data; ",
+           "pass a long-format data.frame or a read0/read1 list")
+    }
+    model_obj <- build_multinomial_model(
+      processed_data,
+      alpha = alpha,
+      dict_prior = or_null(params$dict_prior, "empirical")
+    )
+  } else if (model == "categorical") {
     e1 <- or_null(params$e1, 0.05)
     e2 <- or_null(params$e2, 0.05)
-    
+    llik_tab <- build_categorical_llik_tab(e1, e2)
+    r_mat <- processed_data$r
+    if (is.null(r_mat)) {
+      r_mat <- matrix(0, nrow = processed_data$N, ncol = processed_data$P)
+    }
+
     model_obj <- list(
       name = "categorical",
       y = processed_data$y,
-      r = processed_data$r,
+      r = r_mat,
       N = processed_data$N,
       P = processed_data$P,
       alpha = alpha,
       rho = rho,
       e1 = e1,
       e2 = e2,
+      llik_tab = llik_tab,
       loglikelihood_matrix = categorical_loglikelihood_matrix,
-      loglikelihood_vector = categorical_loglikelihood_vector,
+      loglikelihood_vector = function(propvec, yvec, rvec = NULL) {
+        categorical_loglikelihood_vector(propvec, yvec, llik_tab = llik_tab)
+      },
       initialize_state = categorical_initialize_state,
       resolve_exceptions = categorical_resolve_exceptions
     )
@@ -141,6 +159,8 @@ run_chain <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc,
     cat_w_prefix("Plan to run ", total_iter, " total iterations: ", n_burnin, " burn-in + ",
         n_sample, " sampling, gap = ", if (is.null(gap)) "NULL" else gap, "\n")
   }
+
+  model_obj <- setup_mcmc_kernel(model_obj)
 
   # Clear performance log before starting
   clear_performance_log()
@@ -281,7 +301,7 @@ slice_init <- function(state, model_obj) {
   
   # Expand matrices
   state$A <- cbind(state$A, 0)
-  state$D <- rbind(state$D, stats::runif(model_obj$P) < model_obj$rho)
+  state$D <- rbind(state$D, sample_dictionary_row(model_obj))
   state$ktrunc <- ncol(state$A)
   
   return(state)

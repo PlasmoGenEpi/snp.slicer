@@ -143,3 +143,98 @@ test_that("calculate_allele_frequencies_by_sets errors on invalid target_sets", 
     "non-empty vector"
   )
 })
+
+# Regression: the dictionary-to-allele-label lookup is indexed by D + 1, and the
+# two model families assign the slots in opposite directions. Count models put
+# the minor allele in slot 1 and set D to 1 for it, so D == 0 denotes r1. The
+# categorical model encodes slot 1 as observation 0, so D == 0 denotes r0.
+make_slot_result <- function(model) {
+  # One host carrying one strain; that strain is 0 at the single SNP.
+  A <- matrix(1L, nrow = 1, ncol = 1)
+  D <- matrix(0L, nrow = 1, ncol = 1)
+  list(
+    map_allocation_matrix = A,
+    map_dictionary_matrix = D,
+    final_allocation_matrix = A,
+    final_dictionary_matrix = D,
+    model_info = list(
+      model = model,
+      N = 1,
+      P = 1,
+      data_type = if (model == "categorical") "categorical" else "read_counts",
+      processed_data = list(
+        target_ids = "target_1",
+        r0_values = "slot1",
+        r1_values = "slot2"
+      )
+    )
+  ) |> structure(class = "snp_slice_results")
+}
+
+test_that("a count-model dictionary entry of 0 is labelled with the slot-2 allele", {
+  af <- calculate_allele_frequencies(make_slot_result("negative_binomial"), 1)
+  top <- af[af$frequency > 0, ]
+  expect_equal(nrow(top), 1L)
+  expect_equal(top$allele, "slot2")
+})
+
+test_that("a categorical dictionary entry of 0 is labelled with the slot-1 allele", {
+  af <- calculate_allele_frequencies(make_slot_result("categorical"), 1)
+  top <- af[af$frequency > 0, ]
+  expect_equal(nrow(top), 1L)
+  expect_equal(top$allele, "slot1")
+})
+
+test_that("the two model families label the same dictionary in opposite directions", {
+  count_af <- calculate_allele_frequencies(make_slot_result("poisson"), 1)
+  cat_af <- calculate_allele_frequencies(make_slot_result("categorical"), 1)
+  expect_false(identical(
+    count_af$allele[count_af$frequency > 0],
+    cat_af$allele[cat_af$frequency > 0]
+  ))
+})
+
+# Regression: read0/read1 list input stores read1 in y (slot 2), the long-format
+# loader stores read0 (slot 1). A dictionary 1 always means "carries the y
+# allele", so the label lookup must know which slot y was. Before y_slot was
+# recorded, list-input runs labelled every allele with the other slot's name.
+
+test_that("list input records y_slot = 2 and long-format input y_slot = 1", {
+  lst <- list(read0 = matrix(3, 1, 1), read1 = matrix(4, 1, 1))
+  expect_equal(snp.slicer:::preprocess_data(lst, "negative_binomial")$y_slot, 2L)
+  df <- data.frame(specimen_id = c("s1", "s1"), target_id = "t1",
+                   target_value = c("A", "T"), target_count = c(3, 4))
+  expect_equal(snp.slicer:::preprocess_data(df, "negative_binomial")$y_slot, 1L)
+})
+
+test_that("with y_slot = 2 a count-model dictionary entry of 0 is labelled with the slot-1 allele", {
+  res <- make_slot_result("negative_binomial")
+  res$model_info$processed_data$y_slot <- 2L
+  af <- calculate_allele_frequencies(res, 1)
+  expect_equal(af$allele[af$frequency > 0], "slot1")
+  # and 1 with the slot-2 allele
+  res$map_dictionary_matrix[] <- 1L
+  res$final_dictionary_matrix[] <- 1L
+  af1 <- calculate_allele_frequencies(res, 1)
+  expect_equal(af1$allele[af1$frequency > 0], "slot2")
+})
+
+test_that("a read0-only strain from list input is labelled ref, not alt", {
+  pd <- snp.slicer:::preprocess_data(
+    list(read0 = matrix(100, 1, 1), read1 = matrix(0, 1, 1)), "negative_binomial"
+  )
+  # D == 0: the strain contributes no y (= read1) reads, so it carries read0 = "ref".
+  res <- structure(list(
+    map_allocation_matrix = matrix(1, 1, 1), map_dictionary_matrix = matrix(0, 1, 1),
+    final_allocation_matrix = matrix(1, 1, 1), final_dictionary_matrix = matrix(0, 1, 1),
+    model_info = list(model = "negative_binomial", processed_data = pd)
+  ), class = "snp_slice_results")
+  af <- calculate_allele_frequencies(res, 1, estimate = "map")
+  expect_equal(af$allele[af$frequency > 0], "ref")
+})
+
+test_that("the stored example results carry y_slot = 2 (they were generated from list input)", {
+  res <- load_example_results()
+  expect_equal(res$model_info$processed_data$y_slot, 2L)
+  expect_true(identical(unname(res$model_info$processed_data$y), unname(example_snp_data$read1)))
+})
