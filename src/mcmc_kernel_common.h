@@ -110,7 +110,6 @@ SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double l
   return loglik_const + r * std::log(p) + y * std::log(q);
 }
 
-SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double loglik_const,
 // One allele-slot cell of the multinomial kernel term. Reads for an allele no
 // assigned strain carries (prop == 0) make the state impossible.
 inline double dmultinom_cell_log(double prop, double y) {
@@ -119,7 +118,7 @@ inline double dmultinom_cell_log(double prop, double y) {
   return y * std::log(prop);
 }
 
-inline double loglik_value_fast(double prop, double y, double r, double loglik_const,
+SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double loglik_const,
                                 int model_type) {
   switch (model_type) {
   case POISSON:
