@@ -13,8 +13,8 @@ A biological sample from which reads were obtained, identified by `specimen_id`.
 _Avoid_: Host, individual (in user-facing docs; "individual" may appear in internal MCMC state)
 
 **Allele slot 1 / allele slot 2**:
-The two fixed columns in internal read-count matrices. Slot 1 counts are stored in `y` (read0); slot 2 counts are derived as `r - y` (read1). Allele labels for each slot are `r0_values` and `r1_values`.
-_Avoid_: Overloading "reference/alternate" unless slot assignment is explicitly reference-first
+The two fixed columns in internal read-count matrices. Allele labels for each slot are `r0_values` and `r1_values`. Long-format input stores slot 1 counts in `y` (read0) and derives slot 2 as `r - y`; matrix input (`list(read0, read1)`) stores `read1` in `y` instead. `processed_data$y_slot` (1 or 2) records which, and the allele-label lookup reads it: a dictionary entry of 1 always means the strain carries the allele counted in `y`.
+_Avoid_: Overloading "reference/alternate" unless slot assignment is explicitly reference-first; assuming `y` is slot 1 without checking `y_slot`
 
 **Allele slot ordering (long-format input)**:
 Rules for which allele occupies slot 1 vs slot 2 when the package assigns order:
@@ -52,8 +52,24 @@ _Avoid_: Confusing with correlation or rate parameters
 _Avoid_: Including monomorphic targets in the MAF ratio (they inflate `rho` toward 1)
 
 **Polyallelic target**:
-A target with more than two distinct alleles observed in the dataset. SNP-Slice is biallelic-only; such targets are dropped during loading with a warning listing the dropped `target_id`s.
+A target with more than two distinct alleles observed in the dataset. The biallelic models (categorical, Poisson, binomial, negative binomial) drop such targets during loading with a warning listing the dropped `target_id`s. The multinomial model keeps them; it is the only model that accepts them.
 _Avoid_: Silently discarding them, or erroring on the entire dataset for a single triallelic site
+
+**Multinomial model**:
+Observation model for targets with any number of alleles. Each strain carries exactly one allele per target, stored in the dictionary `D` as an integer allele code (`0` = slot 1, `1` = slot 2, ...). A specimen's expected allele proportions at a target are the fractions of its strains carrying each allele; the observed reads across alleles are multinomial in those proportions. On a two-allele target this is the binomial model exactly. The generic compiled model type `MULTINOMIAL` on the expanded layout remains for likelihood checks.
+_Avoid_: Describing `D` as binary when the multinomial model is in use; treating the model as SNP-specific (a microhaplotype target is just a target with many alleles)
+
+**Allele slot ordering (multinomial model)**:
+Within each target, slots are ordered by descending total `target_count` across specimens, ties broken by `target_value`, so slot 1 is the population **major** allele and dictionary code `0` denotes it. `allele_labels` (one character vector per target, indexed by code + 1) carries every slot's label; `r0_values`/`r1_values` still hold the first two for code that expects them. Matrix input (`list(read0, read1)`) keeps the user's orientation: `read0` is slot 1.
+_Avoid_: Assuming the minor-allele-first ordering of the biallelic count models
+
+**Expanded layout (multinomial model)**:
+Per-target allele counts stored side by side in one `N x L` matrix (`counts_exp`), `L` being the total number of allele slots across targets, with `col_offset`, `col_locus` and `col_allele` mapping columns back to targets and codes. A missing genotype is `NA` across the whole block of its target.
+_Avoid_: Reading `y` as anything more than the slot-1 counts kept for shape compatibility
+
+**Dictionary prior (multinomial model)**:
+Per-target categorical distribution over alleles, the analogue of `rho`. `dict_prior = "empirical"` (default) uses pooled allele read fractions with a pseudocount of one per allele, so a rare allele gets less prior weight in a newly proposed strain than a common one; `"uniform"` gives every allele equal weight; a list of per-target vectors sets it directly.
+_Avoid_: A flat prior on targets with a rare third allele, which lets over-parameterised dictionaries leak mass into rare-allele haplotypes
 
 **Long-format row uniqueness**:
 At most one row per `(specimen_id, target_id, target_value)`. Duplicate keys are invalid input and must error — never silently aggregated.

@@ -11,7 +11,7 @@ slice_iter <- function(state, model_obj) {
 
   kernel <- model_obj$kernel
   if (is.null(kernel)) {
-    kernel <- mcmc_kernel_r()
+    kernel <- mcmc_kernel_r(model_obj)
   }
 
   if (identical(kernel$name, "cpp") && is.null(kernel$obs_code)) {
@@ -32,8 +32,11 @@ slice_iter <- function(state, model_obj) {
     state <- slice_update_mu(state, model_obj)
   }
 
-  # Update log-likelihood and log-posterior
-  if (identical(kernel$name, "cpp") && exists("cpp_loglik_total", where = asNamespace("snp.slicer"), inherits = FALSE)) {
+  # Update log-likelihood and log-posterior. An adapter may supply its own
+  # compiled likelihood (the multinomial kernel does).
+  if (!is.null(kernel$loglik)) {
+    state$loglik <- as.numeric(kernel$loglik(state, model_obj))
+  } else if (identical(kernel$name, "cpp") && exists("cpp_loglik_total", where = asNamespace("snp.slicer"), inherits = FALSE)) {
     obs <- kernel_obs_args(model_obj)
     state$loglik <- as.numeric(cpp_loglik_total(
       A = state$A,
@@ -51,7 +54,7 @@ slice_iter <- function(state, model_obj) {
   state$logpost <- as.numeric(state$loglik) +
                    logprior_a(state$A, state$mu, model_obj$alpha) +
                    logprior_mu(state$mu, model_obj$alpha, model_obj$N) +
-                   logprior_d(state$D, model_obj$rho)
+                   dictionary_logprior(state$D, model_obj)
   
   end_timer("slice_iter")
   return(state)
@@ -69,7 +72,7 @@ slice_update_s <- function(state, model_obj) {
   start_timer("slice_update_s")
   kernel <- model_obj$kernel
   if (is.null(kernel)) {
-    kernel <- mcmc_kernel_r()
+    kernel <- mcmc_kernel_r(model_obj)
   }
   state <- kernel$update_s(state, model_obj)
   end_timer("slice_update_s")
@@ -95,7 +98,7 @@ slice_update_s_r <- function(state, model_obj) {
     state$D <- rbind(state$D, matrix(0, ncol = model_obj$P, nrow = num_new_cols))
 
     for (k in (state$ktrunc + 1):length(state$mu)) {
-      state <- refresh_feature(state, k, model_obj$rho, model_obj$P)
+      state <- refresh_feature(state, k, model_obj)
     }
   }
 
@@ -119,7 +122,7 @@ slice_update_a <- function(state, model_obj) {
   start_timer("slice_update_a")
   kernel <- model_obj$kernel
   if (is.null(kernel)) {
-    kernel <- mcmc_kernel_r()
+    kernel <- mcmc_kernel_r(model_obj)
   }
   state <- kernel$update_a(state, model_obj)
   end_timer("slice_update_a")
@@ -230,7 +233,7 @@ slice_update_d <- function(state, model_obj) {
   start_timer("slice_update_d")
   kernel <- model_obj$kernel
   if (is.null(kernel)) {
-    kernel <- mcmc_kernel_r()
+    kernel <- mcmc_kernel_r(model_obj)
   }
   state <- kernel$update_d(state, model_obj)
   end_timer("slice_update_d")
@@ -307,7 +310,7 @@ slice_update_mu <- function(state, model_obj) {
   start_timer("slice_update_mu")
   kernel <- model_obj$kernel
   if (is.null(kernel)) {
-    kernel <- mcmc_kernel_r()
+    kernel <- mcmc_kernel_r(model_obj)
   }
   state <- kernel$update_mu(state, model_obj)
   end_timer("slice_update_mu")
@@ -446,18 +449,49 @@ logf_oldfeature <- function(x, m, N) {
   return((m - 1) * log(x) + (N - m) * log(1 - x))
 }
 
-#' Refresh feature with random dictionary
+#' Refresh feature with a dictionary row drawn from the prior
 #'
 #' @param state Current state
 #' @param k Feature index
-#' @param rho Dictionary sparsity parameter
-#' @param P Number of SNPs
+#' @param model_obj Model object; supplies the dictionary prior
 #'
 #' @return Updated state
 #' @keywords internal
-#' @importFrom stats runif
-refresh_feature <- function(state, k, rho, P) {
+refresh_feature <- function(state, k, model_obj) {
   state$A[, k] <- 0
-  state$D[k, ] <- (stats::runif(P) < rho)
+  state$D[k, ] <- sample_dictionary_row(model_obj)
   return(state)
+}
+
+#' Draw one dictionary row from the model's prior
+#'
+#' Models that define \code{sample_dict_row} (the multinomial model) draw
+#' allele codes from their per-target priors; every other model draws
+#' independent Bernoulli(\code{rho}) bits.
+#'
+#' @param model_obj Model object
+#' @return Numeric vector of length \code{model_obj$P}
+#' @keywords internal
+#' @importFrom stats runif
+sample_dictionary_row <- function(model_obj) {
+  if (!is.null(model_obj$sample_dict_row)) {
+    return(as.numeric(model_obj$sample_dict_row(model_obj)))
+  }
+  as.numeric(stats::runif(model_obj$P) < model_obj$rho)
+}
+
+#' Log prior of the dictionary under the model's prior
+#'
+#' Dispatches to \code{model_obj$logprior_d} when the model defines one and to
+#' the Bernoulli(\code{rho}) prior in \code{\link{logprior_d}} otherwise.
+#'
+#' @param D Dictionary matrix
+#' @param model_obj Model object
+#' @return Log prior probability
+#' @keywords internal
+dictionary_logprior <- function(D, model_obj) {
+  if (!is.null(model_obj$logprior_d)) {
+    return(model_obj$logprior_d(D, model_obj))
+  }
+  logprior_d(D, model_obj$rho)
 }

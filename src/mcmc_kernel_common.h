@@ -16,7 +16,11 @@
 
 namespace snp_slicer {
 
-enum ModelType { POISSON = 0, BINOMIAL = 1, NEGATIVE_BINOMIAL = 2, CATEGORICAL = 3 };
+// MULTINOMIAL runs on the expanded allele-slot layout: each "target" column is
+// one allele slot, y is that allele's read count and prop the fraction of the
+// specimen's strains carrying it. The per-cell term is y * log(prop); the
+// multinomial coefficient is a constant handled on the R side.
+enum ModelType { POISSON = 0, BINOMIAL = 1, NEGATIVE_BINOMIAL = 2, CATEGORICAL = 3, MULTINOMIAL = 4 };
 
 SNP_SLICER_HOT double mh_ratio(double logp1, double logp0) {
   if (!R_finite(logp1)) return 0.0;
@@ -107,6 +111,15 @@ SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double l
 }
 
 SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double loglik_const,
+// One allele-slot cell of the multinomial kernel term. Reads for an allele no
+// assigned strain carries (prop == 0) make the state impossible.
+inline double dmultinom_cell_log(double prop, double y) {
+  if (ISNA(y) || y == 0.0) return 0.0;
+  if (prop <= 0.0) return R_NegInf;
+  return y * std::log(prop);
+}
+
+inline double loglik_value_fast(double prop, double y, double r, double loglik_const,
                                 int model_type) {
   switch (model_type) {
   case POISSON:
@@ -115,6 +128,8 @@ SNP_SLICER_HOT double loglik_value_fast(double prop, double y, double r, double 
     return dbinom_log_fast(prop, r, y, loglik_const);
   case NEGATIVE_BINOMIAL:
     return dnbinom_log_fast(prop, r, y, loglik_const);
+  case MULTINOMIAL:
+    return loglik_const + dmultinom_cell_log(prop, y);
   default:
     return R_NaN;
   }
@@ -139,6 +154,9 @@ SNP_SLICER_HOT double count_loglik_y0_fast(double prop, double r, double loglik_
     const double p = 1.0 / (1.0 + prop);
     return loglik_const + r * std::log(p);
   }
+  case MULTINOMIAL:
+    // No reads for this allele: the cell contributes nothing whatever prop is.
+    return loglik_const;
   default:
     return R_NaN;
   }
@@ -152,6 +170,8 @@ inline double loglik_value(double y, double r, double prop, int model_type) {
     return dbinom_log_native(y, r, prop);
   case NEGATIVE_BINOMIAL:
     return dnbinom_log_native(y, r, prop);
+  case MULTINOMIAL:
+    return dmultinom_cell_log(prop, y);
   default:
     return R_NaN;
   }

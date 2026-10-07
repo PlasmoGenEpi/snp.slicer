@@ -95,7 +95,13 @@ binomial_initialize_state <- function(model_obj, threshold = 0.001) {
     # Reorder strains (single infection strains first)
     ord <- rep(NA, nstrain)
     ord[1:nsinglestrain] <- unique(assignments[which_single])
-    ord[(nsinglestrain + 1):nstrain] <- setdiff(unique(assignments), unique(assignments[which_single]))
+    # Every strain may already belong to a single infection (all specimens
+    # single, or each mixed specimen's rounded genotype matching a single one);
+    # then there is nothing left to append and the colon range would be invalid.
+    remaining_strains <- setdiff(unique(assignments), unique(assignments[which_single]))
+    if (length(remaining_strains) > 0) {
+      ord[(nsinglestrain + 1):(nsinglestrain + length(remaining_strains))] <- remaining_strains
+    }
     
     state$A <- state$A[, ord, drop = FALSE]
     state$D <- state$D[ord, , drop = FALSE]

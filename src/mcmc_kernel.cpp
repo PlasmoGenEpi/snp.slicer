@@ -344,6 +344,176 @@ void update_a(SliceState& state, ModelData& model) {
   }
 }
 
+// Locus-aware allocation update for the multinomial model.
+//
+// The generic update_a on the expanded allele-slot layout evaluates every slot
+// of every target for both states of A[i,k]. For a multinomial cell only the
+// slot that strain k carries at target p differs between the two states: with
+// leave-k-out carrier count c at that slot, reads y there and total reads r_p,
+//
+//   logp1 - logp0 (target p) = y * (log(c + 1) - log(c)) - r_p * (log(a0 + 1) - log(a0))
+//
+// and the r_p term sums to the host's total reads times one constant. Both
+// bracketed differences are log((c + 1) / c) for an integer c <= K, so they
+// come from a table and the inner loop does one multiply-add per target. A
+// zero c with y > 0 means the state without k is impossible (logp0 = -Inf),
+// which forces acceptance exactly as the generic path does.
+void update_a_multinomial(SliceState& state,
+                          const Rcpp::IntegerMatrix& D_codes,
+                          const Rcpp::IntegerVector& mixed,
+                          const Rcpp::NumericMatrix& counts,
+                          const Rcpp::IntegerVector& col_offset,
+                          const Rcpp::NumericMatrix& r_totals) {
+  Rcpp::NumericMatrix& A = state.A;
+  const Rcpp::NumericVector& mu = state.mu;
+  int& kstar = state.kstar;
+  const int N = A.nrow();
+  const int K = A.ncol();
+  const int P = D_codes.ncol();
+  const int L = counts.ncol();
+  const int mu_len = mu.size();
+  int kplus = state.kplus;
+  if (kplus > K) kplus = K;
+  if (kplus > mu_len) kplus = mu_len;
+  if (kplus < 0) kplus = 0;
+  if (D_codes.nrow() != K) {
+    Rcpp::stop("update_a_multinomial: ncol(A)=%d must equal nrow(D)=%d", K, D_codes.nrow());
+  }
+
+  Eigen::Map<Eigen::MatrixXd> A_e(A.begin(), N, K);
+  const double* counts_col = counts.begin();
+  const double* r_col = r_totals.begin();
+  const int* D_col = D_codes.begin();
+  auto d_at = [&](int k_idx, int p) { return D_col[k_idx + p * K]; };
+
+  ColSumTracker col_tracker;
+  col_tracker.init(A_e);
+
+  std::vector<double> log_mu(static_cast<std::size_t>(mu_len));
+  std::vector<double> log_1m_mu(static_cast<std::size_t>(mu_len));
+  for (int k = 0; k < mu_len; ++k) {
+    log_mu[static_cast<std::size_t>(k)] = std::log(mu[k]);
+    log_1m_mu[static_cast<std::size_t>(k)] = std::log(1.0 - mu[k]);
+  }
+
+  // log((c + 1) / c) for integer carrier counts c = 1..K (c = 0 is handled
+  // as the impossible-state case and never indexed).
+  std::vector<double> log_ratio(static_cast<std::size_t>(K) + 2, 0.0);
+  for (int c = 1; c <= K + 1; ++c) {
+    log_ratio[static_cast<std::size_t>(c)] =
+      std::log(static_cast<double>(c) + 1.0) - std::log(static_cast<double>(c));
+  }
+
+  std::vector<double> full_row(static_cast<std::size_t>(L));
+  std::vector<int> slot_of_k(static_cast<std::size_t>(P));
+
+  for (int m = 0; m < mixed.size(); ++m) {
+    const int host = mixed[m] - 1;
+
+    // Carrier count per allele slot over the strains this host carries.
+    std::fill(full_row.begin(), full_row.end(), 0.0);
+    double row_sum = 0.0;
+    for (int kk = 0; kk < K; ++kk) {
+      const double a = A(host, kk);
+      if (a <= 0.0) continue;
+      row_sum += a;
+      for (int p = 0; p < P; ++p) {
+        full_row[static_cast<std::size_t>(col_offset[p] + d_at(kk, p))] += a;
+      }
+    }
+    // Total reads across observed targets: the a0 -> a0 + 1 normalisation
+    // shift enters every read once.
+    double reads_host = 0.0;
+    for (int p = 0; p < P; ++p) {
+      const double rp = r_col[host + p * N];
+      if (!ISNA(rp)) reads_host += rp;
+    }
+
+    for (int k = 1; k <= kplus; ++k) {
+      const int k_idx = k - 1;
+      const double old_a = A(host, k_idx);
+      const double a0 = row_sum - old_a;
+
+      for (int p = 0; p < P; ++p) {
+        slot_of_k[static_cast<std::size_t>(p)] = col_offset[p] + d_at(k_idx, p);
+      }
+
+      if (a0 == 0.0) {
+        A(host, k_idx) = 1.0;
+        if (A(host, k_idx) != old_a) {
+          const double delta = A(host, k_idx) - old_a;
+          for (int p = 0; p < P; ++p) {
+            full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+          }
+          row_sum += delta;
+          col_tracker.apply_delta(k_idx, delta);
+          if (A(host, k_idx) == 1.0) {
+            kstar = std::max(kstar, k);
+          } else if (k == kstar && col_tracker.sums[static_cast<std::size_t>(k_idx)] == 0.0) {
+            kstar = col_tracker.kstar_from_active();
+          }
+        }
+        continue;
+      }
+
+      double logp0 = log_1m_mu[static_cast<std::size_t>(k_idx)];
+      double logp1 = log_mu[static_cast<std::size_t>(k_idx)];
+
+      double lik_ratio = 0.0;
+      bool without_k_impossible = false;
+      for (int p = 0; p < P; ++p) {
+        const int slot = slot_of_k[static_cast<std::size_t>(p)];
+        const double y = counts_col[host + slot * N];
+        if (ISNA(y) || y == 0.0) continue;
+        const double c = full_row[static_cast<std::size_t>(slot)] - old_a;
+        if (c <= 0.0) {
+          without_k_impossible = true;
+          break;
+        }
+        lik_ratio += y * log_ratio[static_cast<std::size_t>(static_cast<int>(c + 0.5))];
+      }
+      if (without_k_impossible) {
+        logp0 = R_NegInf;
+      } else {
+        lik_ratio -= reads_host * log_ratio[static_cast<std::size_t>(static_cast<int>(a0 + 0.5))];
+        logp1 += lik_ratio;
+      }
+
+      if (k == kstar && old_a == 1.0 &&
+          col_tracker.sums[static_cast<std::size_t>(k_idx)] - old_a == 0.0) {
+        logp1 -= log_mu[static_cast<std::size_t>(k_idx)];
+        const int next_kstar = col_tracker.second_last_active_col();
+        if (next_kstar >= 0) {
+          logp0 -= log_mu[static_cast<std::size_t>(next_kstar)];
+        }
+      } else if (k > kstar) {
+        logp1 -= log_mu[static_cast<std::size_t>(k_idx)];
+        if (kstar >= 1) {
+          logp0 -= log_mu[static_cast<std::size_t>(kstar - 1)];
+        }
+      }
+
+      const double accept = mh_ratio(logp1, logp0);
+      const double draw = unif_rand();
+      A(host, k_idx) = draw < accept ? 1.0 : 0.0;
+
+      if (A(host, k_idx) != old_a) {
+        const double delta = A(host, k_idx) - old_a;
+        for (int p = 0; p < P; ++p) {
+          full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+        }
+        row_sum += delta;
+        col_tracker.apply_delta(k_idx, delta);
+        if (A(host, k_idx) == 1.0) {
+          kstar = std::max(kstar, k);
+        } else if (k == kstar && col_tracker.sums[static_cast<std::size_t>(k_idx)] == 0.0) {
+          kstar = col_tracker.kstar_from_active();
+        }
+      }
+    }
+  }
+}
+
 void update_d(SliceState& state, ModelData& model) {
   Rcpp::NumericMatrix& A = state.A;
   Rcpp::NumericMatrix& D = state.D;
@@ -545,6 +715,30 @@ Rcpp::List cpp_update_a(Rcpp::NumericMatrix A,
   snp_slicer::kernel::prepare_obs_views(model, loglik_const, obs_code);
 
   snp_slicer::kernel::update_a(state, model);
+
+  return Rcpp::List::create(
+    Rcpp::_["A"] = state.A,
+    Rcpp::_["kstar"] = state.kstar
+  );
+}
+
+// [[Rcpp::export]]
+Rcpp::List cpp_update_a_multinomial(Rcpp::NumericMatrix A,
+                                    Rcpp::IntegerMatrix D_codes,
+                                    Rcpp::NumericVector mu,
+                                    Rcpp::IntegerVector mixed,
+                                    int kplus,
+                                    int kstar,
+                                    Rcpp::NumericMatrix counts,
+                                    Rcpp::IntegerVector col_offset,
+                                    Rcpp::NumericMatrix r_totals) {
+  snp_slicer::kernel::SliceState state;
+  state.A = A;
+  state.mu = mu;
+  state.kplus = kplus;
+  state.kstar = kstar;
+
+  snp_slicer::kernel::update_a_multinomial(state, D_codes, mixed, counts, col_offset, r_totals);
 
   return Rcpp::List::create(
     Rcpp::_["A"] = state.A,

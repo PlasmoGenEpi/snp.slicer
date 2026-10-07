@@ -31,6 +31,7 @@ model_type_id <- function(model_name) {
     binomial = 1L,
     negative_binomial = 2L,
     categorical = 3L,
+    multinomial = 4L,
     stop("Model not supported by compiled MCMC kernel: ", model_name)
   )
 }
@@ -190,16 +191,190 @@ resolve_mcmc_kernel <- function(model_obj, backend = getOption("snp.slicer.mcmc_
     stop("Unknown MCMC kernel backend: ", backend)
   )
 
+  # The multinomial model has a hybrid adapter: compiled allocation update,
+  # R dictionary/stick updates (which cost under 1% of an iteration).
+  if (identical(model_obj$name, "multinomial")) {
+    use_hybrid <- switch(backend,
+      cpp = TRUE,
+      r = FALSE,
+      auto = cpp_kernel_available()
+    )
+    if (use_hybrid) {
+      return(mcmc_kernel_multinomial_cpp(model_obj))
+    }
+    return(mcmc_kernel_r(model_obj))
+  }
+
   if (use_cpp) {
     kernel_with_obs_cache(mcmc_kernel_cpp(), model_obj)
   } else {
-    mcmc_kernel_r()
+    mcmc_kernel_r(model_obj)
   }
 }
 
-#' R reference kernel adapter
+#' Compiled kernel adapter for the multinomial model
+#'
+#' Like the biallelic compiled adapter, every update runs in compiled code and
+#' \code{update_iter} fuses the slice-variable, allocation, dictionary and
+#' stick-breaking steps into one call. The adapter also supplies
+#' \code{loglik}, the compiled kernel term plus the model's multinomial
+#' coefficients.
+#'
+#' The adapter's name is \code{"cpp_multinomial"} rather than \code{"cpp"} which
+#' is the biallelic adaptor name:
+#' \code{slice_iter()} must not route it through the generic observation
+#' cache or the generic total likelihood but instead via the multinomial one.
+#'
+#' @param model_obj Multinomial model object
+#' @param fused Use the fused compiled iteration (default). With
+#'   \code{FALSE} the adapter runs the compiled allocation and dictionary
+#'   updates with the R slice-variable and stick-breaking updates, which is
+#'   the configuration comparable step for step with the R reference.
+#' @return Kernel adapter list
 #' @keywords internal
-mcmc_kernel_r <- function() {
+mcmc_kernel_multinomial_cpp <- function(model_obj, fused = TRUE) {
+  if (!cpp_kernel_available()) {
+    stop("Compiled MCMC kernel is not available; rebuild the package with Rcpp.")
+  }
+  kernel <- list(
+    name = "cpp_multinomial",
+    update_s = slice_update_s_r,
+    update_mu = slice_update_mu_r,
+    update_a = multinomial_update_a_cpp,
+    update_d = multinomial_update_d_cpp,
+    loglik = multinomial_loglik_cpp
+  )
+  if (fused) {
+    kernel$update_iter <- multinomial_update_iter_cpp
+  }
+  kernel
+}
+
+#' Integer-coded dictionary for the compiled multinomial entry points
+#' @keywords internal
+multinomial_dict_codes <- function(D) {
+  storage.mode(D) <- "integer"
+  D
+}
+
+#' Compiled dictionary update for the multinomial model
+#'
+#' Gibbs step over alleles in ratio form; see
+#' \code{\link{multinomial_update_d_r}} for the reference and
+#' \code{update_d_multinomial} in the C++ source for the derivation.
+#'
+#' @param state Current state
+#' @param model_obj Model object
+#' @return Updated state
+#' @keywords internal
+multinomial_update_d_cpp <- function(state, model_obj) {
+  D <- cpp_update_d_multinomial(
+    A = state$A,
+    D_codes = multinomial_dict_codes(state$D),
+    kmin = as.integer(state$kmin),
+    kstar = as.integer(state$kstar),
+    counts = model_obj$counts_exp,
+    col_offset = as.integer(model_obj$col_offset),
+    n_alleles = as.integer(model_obj$n_alleles),
+    log_prior_pad = model_obj$log_dict_prior_pad,
+    prior_pad = model_obj$dict_prior_pad
+  )
+  storage.mode(D) <- "double"
+  state$D <- restore_matrix_dimnames(D, state$D)
+  state
+}
+
+#' Compiled total log-likelihood for the multinomial model
+#' @keywords internal
+multinomial_loglik_cpp <- function(state, model_obj) {
+  cpp_loglik_multinomial(
+    A = state$A,
+    D_codes = multinomial_dict_codes(state$D),
+    counts = model_obj$counts_exp,
+    col_offset = as.integer(model_obj$col_offset)
+  ) + model_obj$loglik_const
+}
+
+#' Fused compiled slice iteration for the multinomial model
+#' @keywords internal
+multinomial_update_iter_cpp <- function(state, model_obj) {
+  result <- cpp_slice_iter_multinomial(
+    A = state$A,
+    D_codes = multinomial_dict_codes(state$D),
+    mu = state$mu,
+    mixed = as.integer(state$mixed),
+    kplus = as.integer(state$kplus),
+    kstar = as.integer(state$kstar),
+    kmin = as.integer(state$kmin),
+    ktrunc = as.integer(state$ktrunc),
+    counts = model_obj$counts_exp,
+    col_offset = as.integer(model_obj$col_offset),
+    n_alleles = as.integer(model_obj$n_alleles),
+    log_prior_pad = model_obj$log_dict_prior_pad,
+    prior_pad = model_obj$dict_prior_pad,
+    r_totals = model_obj$r,
+    alpha = model_obj$alpha,
+    N = as.integer(model_obj$N)
+  )
+  D <- result$D
+  storage.mode(D) <- "double"
+  state$A <- result$A
+  state$D <- restore_matrix_dimnames(D, state$D)
+  state$mu <- result$mu
+  state$kplus <- result$kplus
+  state$kstar <- result$kstar
+  state$ktrunc <- result$ktrunc
+  state
+}
+
+#' Compiled allocation update for the multinomial model
+#'
+#' Calls the locus-aware compiled update: for each specimen and strain, the
+#' likelihood ratio between carrying and not carrying the strain involves only
+#' the allele slot the strain carries at each target, so the compiled loop
+#' visits one slot per target and takes its log terms from a table. It reads
+#' the integer dictionary directly; no expanded layout is built.
+#'
+#' @param state Current state
+#' @param model_obj Model object
+#' @return Updated state
+#' @keywords internal
+multinomial_update_a_cpp <- function(state, model_obj) {
+  D_codes <- state$D
+  storage.mode(D_codes) <- "integer"
+  result <- cpp_update_a_multinomial(
+    A = state$A,
+    D_codes = D_codes,
+    mu = state$mu,
+    mixed = as.integer(state$mixed),
+    kplus = as.integer(state$kplus),
+    kstar = as.integer(state$kstar),
+    counts = model_obj$counts_exp,
+    col_offset = as.integer(model_obj$col_offset),
+    r_totals = model_obj$r
+  )
+  state$A <- result$A
+  state$kstar <- result$kstar
+  state
+}
+
+#' R reference kernel adapter
+#'
+#' @param model_obj Optional model object. The multinomial model has its own
+#'   allocation and dictionary updates (integer dictionary, Gibbs over
+#'   alleles); every other model, and a \code{NULL}, gets the binary reference
+#'   updates.
+#' @keywords internal
+mcmc_kernel_r <- function(model_obj = NULL) {
+  if (!is.null(model_obj) && identical(model_obj$name, "multinomial")) {
+    return(list(
+      name = "r",
+      update_s = slice_update_s_r,
+      update_mu = slice_update_mu_r,
+      update_a = multinomial_update_a_r,
+      update_d = multinomial_update_d_r
+    ))
+  }
   list(
     name = "r",
     update_s = slice_update_s_r,
