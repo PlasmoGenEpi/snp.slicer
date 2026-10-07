@@ -56,7 +56,7 @@ validate_input_data <- function(data, model, ...) {
     }
 
     # Structural checks shared by all long-format data.frames (categorical or count)
-    validate_long_dataframe(data, params)
+    validate_long_dataframe(data, params, model = model)
     return(TRUE)
   }
 
@@ -130,9 +130,12 @@ validate_input_data <- function(data, model, ...) {
 #' @param data Long-format data.frame.
 #' @param params List of resolved column names with elements
 #'   \code{specimen_id_col}, \code{target_id_col}, \code{target_value_col}.
+#' @param model Model name. The multinomial model keeps targets with any
+#'   number of alleles, so it only needs one polymorphic target (two or more
+#'   observed alleles); every other model needs a biallelic one.
 #' @return Invisibly \code{TRUE}; otherwise throws an error.
 #' @keywords internal
-validate_long_dataframe <- function(data, params) {
+validate_long_dataframe <- function(data, params, model = NULL) {
   sid <- params$specimen_id_col
   tid <- params$target_id_col
   tval <- params$target_value_col
@@ -144,18 +147,27 @@ validate_long_dataframe <- function(data, params) {
          ") rows; each allele must appear at most once per specimen and target")
   }
 
-  # At least one biallelic locus (exactly two observed alleles) must survive the
-  # downstream <=2-allele filter, or there is no variation to model.
   alleles_per_target <- tapply(data[[tval]], data[[tid]], function(v) length(unique(v)))
-  if (length(alleles_per_target) == 0 || !any(alleles_per_target == 2)) {
+  multiallelic <- identical(model, "multinomial")
+  usable <- if (multiallelic) alleles_per_target >= 2 else alleles_per_target == 2
+
+  # At least one target with allelic variation must survive loading, or there
+  # is no variation to model.
+  if (length(alleles_per_target) == 0 || !any(usable)) {
+    if (multiallelic) {
+      stop("Input data has no polymorphic targets (targets with two or more observed alleles)")
+    }
     stop("Input data has no biallelic loci (targets with exactly two observed alleles)")
   }
 
-  # At least one biallelic locus must have positive total reads
-  biallelic_targets <- names(alleles_per_target)[alleles_per_target == 2]
-  biallelic_rows <- data[[tid]] %in% biallelic_targets
-  total_by_biallelic <- tapply(data[[tcol]][biallelic_rows], data[[tid]][biallelic_rows], sum, na.rm = TRUE)
-  if (!any(total_by_biallelic > 0)) {
+  # At least one such target must have positive total reads
+  usable_targets <- names(alleles_per_target)[usable]
+  usable_rows <- data[[tid]] %in% usable_targets
+  total_by_target <- tapply(data[[tcol]][usable_rows], data[[tid]][usable_rows], sum, na.rm = TRUE)
+  if (!any(total_by_target > 0)) {
+    if (multiallelic) {
+      stop("All polymorphic targets have zero or missing total reads")
+    }
     stop("All biallelic loci have zero or missing total reads")
   }
 
@@ -380,7 +392,9 @@ load_dataframe <- function(
     target_ids = target_ids,
     specimen_ids = specimen_ids,
     r0_values = r0_values_ordered,
-    r1_values = r1_values_ordered
+    r1_values = r1_values_ordered,
+    # y holds slot-1 (read0) counts, so a dictionary 1 means the slot-1 allele
+    y_slot = 1L
   ))
 
 }
@@ -426,6 +440,121 @@ load_dataframe_categorical <- function(
   )
 }
 
+#' Load a long-format data.frame keeping every allele at every target
+#'
+#' Multi-allelic counterpart of \code{\link{load_dataframe}} for the
+#' multinomial model. No target is dropped for having more than two alleles.
+#' Within each target, alleles are ordered by descending total
+#' \code{target_count} across specimens (ties broken by \code{target_value}),
+#' so slot 1 is the population major allele and the dictionary code \code{0}
+#' denotes it.
+#'
+#' @inheritParams load_dataframe
+#' @param ... Ignored; absorbs model parameters such as \code{dict_prior} that
+#'   travel alongside column-name overrides.
+#' @return Processed data list; see \code{\link{build_multiallelic_processed}}
+#'   for the fields.
+#' @keywords internal
+load_dataframe_multiallelic <- function(
+  data, model = "multinomial", target_id_col = "target_id", target_value_col = "target_value",
+  specimen_id_col = "specimen_id", target_count_col = "target_count", ...) {
+  data_renamed <- data |>
+    dplyr::rename(
+      target_id = !!target_id_col,
+      target_value = !!target_value_col,
+      specimen_id = !!specimen_id_col,
+      target_count = !!target_count_col
+    ) |>
+    dplyr::select(target_id, target_value, specimen_id, target_count)
+
+  target_alleles <- data_renamed |>
+    dplyr::group_by(target_id, target_value) |>
+    dplyr::summarize(total_count = sum(target_count, na.rm = TRUE), .groups = "drop") |>
+    dplyr::group_by(target_id) |>
+    dplyr::arrange(dplyr::desc(total_count), target_value, .by_group = TRUE) |>
+    dplyr::mutate(target_idx = dplyr::row_number()) |>
+    dplyr::ungroup() |>
+    dplyr::select(-total_count)
+
+  specimen_ids <- sort(unique(data_renamed$specimen_id))
+  target_ids <- sort(unique(target_alleles$target_id))
+
+  counts_by_idx <- data_renamed |>
+    dplyr::inner_join(target_alleles, by = c("target_id", "target_value")) |>
+    dplyr::select(specimen_id, target_id, target_idx, target_count) |>
+    dplyr::mutate(target_count = ifelse(is.na(target_count), 0, target_count))
+
+  counts_list <- vector("list", length(target_ids))
+  allele_labels <- vector("list", length(target_ids))
+  for (p in seq_along(target_ids)) {
+    alleles_p <- target_alleles[target_alleles$target_id == target_ids[p], ]
+    alleles_p <- alleles_p[order(alleles_p$target_idx), ]
+    m <- matrix(0, nrow = length(specimen_ids), ncol = nrow(alleles_p),
+                dimnames = list(specimen_ids, alleles_p$target_value))
+    rows_p <- counts_by_idx[counts_by_idx$target_id == target_ids[p], ]
+    m[cbind(match(rows_p$specimen_id, specimen_ids), rows_p$target_idx)] <- rows_p$target_count
+    counts_list[[p]] <- m
+    allele_labels[[p]] <- alleles_p$target_value
+  }
+
+  build_multiallelic_processed(counts_list, allele_labels, specimen_ids, target_ids, model)
+}
+
+#' Assemble processed multi-allelic data from per-target count matrices
+#'
+#' @param counts_list List with one \code{N x M_p} count matrix per target,
+#'   columns in allele-slot order.
+#' @param allele_labels List of character vectors, the allele label of each
+#'   slot per target.
+#' @param specimen_ids,target_ids Row and target identifiers.
+#' @param model Model name recorded in the output.
+#' @return A processed data list with the fields the biallelic loaders produce
+#'   (\code{y} holds slot-1 counts, \code{r} the per-target totals, \code{NA}
+#'   where a specimen has no reads at a target) plus the expanded layout:
+#'   \code{counts_exp} (\code{N x L}), \code{n_alleles}, \code{col_offset},
+#'   \code{col_locus}, \code{col_allele}, and \code{allele_labels}.
+#'   \code{r0_values}/\code{r1_values} carry the slot-1 and slot-2 labels for
+#'   code that expects them; slot 2 repeats slot 1 at monomorphic targets.
+#' @keywords internal
+build_multiallelic_processed <- function(counts_list, allele_labels, specimen_ids,
+                                         target_ids, model) {
+  P <- length(counts_list)
+  N <- length(specimen_ids)
+  n_alleles <- vapply(counts_list, ncol, integer(1))
+  totals <- vapply(counts_list, rowSums, numeric(N))
+  totals <- matrix(totals, nrow = N, ncol = P, dimnames = list(specimen_ids, target_ids))
+  missing <- totals == 0
+  totals[missing] <- NA_real_
+
+  for (p in seq_len(P)) {
+    counts_list[[p]][missing[, p], ] <- NA_real_
+  }
+  counts_exp <- do.call(cbind, counts_list)
+  rownames(counts_exp) <- specimen_ids
+
+  y <- matrix(vapply(counts_list, function(m) m[, 1], numeric(N)),
+              nrow = N, ncol = P, dimnames = list(specimen_ids, target_ids))
+
+  list(
+    y = y,
+    r = totals,
+    N = N,
+    P = P,
+    model = model,
+    data_type = "read_counts_multiallelic",
+    target_ids = target_ids,
+    specimen_ids = specimen_ids,
+    r0_values = vapply(allele_labels, function(x) x[1], character(1)),
+    r1_values = vapply(allele_labels, function(x) if (length(x) > 1) x[2] else x[1], character(1)),
+    allele_labels = allele_labels,
+    n_alleles = n_alleles,
+    col_offset = c(0L, cumsum(n_alleles)[-P]),
+    col_locus = rep(seq_len(P), times = n_alleles),
+    col_allele = unlist(lapply(n_alleles, function(m) seq_len(m) - 1L), use.names = FALSE),
+    counts_exp = counts_exp
+  )
+}
+
 #' Preprocess data for SNP-Slice
 #'
 #' @param data Input data
@@ -438,6 +567,9 @@ preprocess_data <- function(data, model, ...) {
   if (is.data.frame(data)) {
     if (model == "categorical") {
       return(load_dataframe_categorical(data, model, ...))
+    }
+    if (model == "multinomial") {
+      return(load_dataframe_multiallelic(data, model, ...))
     }
     return(load_dataframe(data, model, ...))
   }
@@ -486,7 +618,20 @@ preprocess_data <- function(data, model, ...) {
     if (is.null(colnames(y))) {
       colnames(y) <- paste0("target_", seq_len(ncol(y)))
     }
-    
+
+    if (model == "multinomial") {
+      # Matrix input keeps the user's orientation: read0 is slot 1, read1 slot 2.
+      P <- ncol(y)
+      counts_list <- lapply(seq_len(P), function(p) cbind(read0[, p], read1[, p]))
+      return(build_multiallelic_processed(
+        counts_list,
+        allele_labels = rep(list(c("ref", "alt")), P),
+        specimen_ids = rownames(y),
+        target_ids = colnames(y),
+        model = model
+      ))
+    }
+
     return(list(
       y = y,
       r = r,
@@ -497,7 +642,11 @@ preprocess_data <- function(data, model, ...) {
       target_ids = colnames(y),
       specimen_ids = rownames(y),
       r0_values = rep("ref", ncol(y)),
-      r1_values = rep("alt", ncol(y))
+      r1_values = rep("alt", ncol(y)),
+      # Unlike the long-format loader, y holds read1 here (slot 2), so a
+      # dictionary 1 means the slot-2 allele. The allele-label lookup reads
+      # this flag; the sampler itself is orientation-agnostic.
+      y_slot = 2L
     ))
   }
 
@@ -810,13 +959,22 @@ calculate_allele_frequencies <- function(results, snp_indices, estimate = c("fin
 
   r0_values <- results$model_info$processed_data$r0_values[snp_indices]
   r1_values <- results$model_info$processed_data$r1_values[snp_indices]
+  # Multi-allelic runs carry one label vector per target, indexed by dictionary code
+  allele_labels <- results$model_info$processed_data$allele_labels
+  if (!is.null(allele_labels)) {
+    allele_labels <- allele_labels[snp_indices]
+  }
+  # Which allele slot y counted (1 for long-format input, 2 for read0/read1
+  # lists); results saved before the flag existed came from long-format loads
+  # unless patched, so default to 1.
+  y_slot <- or_null(results$model_info$processed_data$y_slot, 1L)
 
   if (estimate != "posterior") {
     # Point estimate (MAP or final sample): single iteration, return count and total_parasites
     matrices <- point_estimate_matrices(results, estimate)
     A <- matrices$A
     D <- matrices$D
-    allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model)
+    allele_counts <- calculate_allele_counts_single(A, D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model, allele_labels = allele_labels, y_slot = y_slot)
     total_parasites <- sum(allele_counts$count)
     result_df <- data.frame(
       allele = allele_counts$allele,
@@ -839,7 +997,7 @@ calculate_allele_frequencies <- function(results, snp_indices, estimate = c("fin
     sample_indices <- sample(seq_len(n_total_samples), n_samples, replace = FALSE)
     allele_counts_list <- lapply(sample_indices, function(i) {
       sample_data <- samples[[i]]
-      calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model)
+      calculate_allele_counts_single(sample_data$A, sample_data$D, snp_indices, r0_values, r1_values, sep = allele_sep, model = results$model_info$model, allele_labels = allele_labels, y_slot = y_slot)
     })
     result_df <- summarize_allele_frequencies_mcmc(allele_counts_list, interval = interval, n_samples = n_samples)
   }
@@ -952,17 +1110,32 @@ summarize_allele_frequencies_mcmc <- function(allele_counts_list, interval = 0.9
 }
 
 #' Calculate allele counts for a single sample
+#'
+#' @param allele_labels Optional list, one character vector per entry of
+#'   \code{snp_indices}, giving the label of each allele code at that target
+#'   (multinomial model). When supplied it overrides \code{r0_values} and
+#'   \code{r1_values}.
+#' @param y_slot For count models, the allele slot whose counts were modelled
+#'   as \code{y}: 1 (long-format input, \code{y = read0}) or 2 (read0/read1
+#'   list input, \code{y = read1}). A dictionary entry of 1 always means the
+#'   strain carries the \code{y} allele, so this decides which label that is.
 #' @keywords internal
-calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_values, sep = "|", model = NULL) {
+calculate_allele_counts_single <- function(A, D, snp_indices, r0_values, r1_values, sep = "|", model = NULL, allele_labels = NULL, y_slot = 1L) {
 
   n_snps <- length(snp_indices)
   n_strains <- nrow(D)
   n_individuals <- nrow(A)
   # rs[[j]] is indexed by D + 1, so its first element is the allele that a
-  # dictionary entry of 0 denotes. Count models place the minor allele in slot 1
-  # and set D to 1 for it, so 0 denotes the slot-2 allele (r1). The categorical
-  # model encodes slot 1 as observation 0, so there 0 denotes r0.
-  rs <- if (identical(model, "categorical")) {
+  # dictionary entry of 0 denotes. In the count models D == 1 means the strain
+  # carries the allele counted in y: slot 1 (r0) for long-format input, slot 2
+  # (r1) for read0/read1 lists, as recorded by y_slot. The categorical model
+  # encodes slot 1 as observation 0, so there 0 denotes r0. The multinomial
+  # model stores the slot index directly, so its labels are used as given.
+  rs <- if (!is.null(allele_labels)) {
+    unname(allele_labels)
+  } else if (identical(model, "categorical")) {
+    Map(c, r0_values, r1_values)
+  } else if (identical(as.integer(y_slot), 2L)) {
     Map(c, r0_values, r1_values)
   } else {
     Map(c, r1_values, r0_values)

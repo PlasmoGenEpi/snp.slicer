@@ -49,7 +49,7 @@ categorical_prop_bin_vec <- function(prop) {
 #' A mixed host used to be initialized carrying every strain in the dictionary.
 #' That is not a biological state -- on a 400-specimen panel it starts hosts at a
 #' COI of ~289 -- and it manufactures likelihood exceptions that cannot be
-#' repaired. `llik_tab` is `-Inf` at [prop bin 3, y == 0], bin 3 being
+#' repaired. `llik_tab` is `-Inf` at (prop bin 3, y == 0), bin 3 being
 #' `prop > 0.99`; a host carrying all K strains at a locus where K-1 of them
 #' carry the alternate sits at `(K-1)/K`, which is inside bin 3 once K > 100.
 #' [categorical_resolve_exceptions()] repairs such a cell by adding a single

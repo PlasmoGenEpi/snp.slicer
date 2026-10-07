@@ -13,12 +13,28 @@ cpp_update_a <- function(A, D, mu, mixed, kplus, kstar, y, r, model_type, llik_t
     .Call(`_snp_slicer_cpp_update_a`, A, D, mu, mixed, kplus, kstar, y, r, model_type, llik_tab, loglik_const, obs_code)
 }
 
+cpp_update_a_multinomial <- function(A, D_codes, mu, mixed, kplus, kstar, counts, col_offset, r_totals) {
+    .Call(`_snp_slicer_cpp_update_a_multinomial`, A, D_codes, mu, mixed, kplus, kstar, counts, col_offset, r_totals)
+}
+
 cpp_update_d <- function(A, D, an, kmin, kstar, y, r, rho, model_type, llik_tab, loglik_const = NULL, obs_code = NULL) {
     .Call(`_snp_slicer_cpp_update_d`, A, D, an, kmin, kstar, y, r, rho, model_type, llik_tab, loglik_const, obs_code)
 }
 
 cpp_slice_iter <- function(A, D, mu, mixed, kplus, kstar, kmin, ktrunc, y, r, rho, alpha, N, P, model_type, llik_tab, loglik_const = NULL, obs_code = NULL) {
     .Call(`_snp_slicer_cpp_slice_iter`, A, D, mu, mixed, kplus, kstar, kmin, ktrunc, y, r, rho, alpha, N, P, model_type, llik_tab, loglik_const, obs_code)
+}
+
+cpp_update_d_multinomial <- function(A, D_codes, kmin, kstar, counts, col_offset, n_alleles, log_prior_pad, prior_pad) {
+    .Call(`_snp_slicer_cpp_update_d_multinomial`, A, D_codes, kmin, kstar, counts, col_offset, n_alleles, log_prior_pad, prior_pad)
+}
+
+cpp_loglik_multinomial <- function(A, D_codes, counts, col_offset) {
+    .Call(`_snp_slicer_cpp_loglik_multinomial`, A, D_codes, counts, col_offset)
+}
+
+cpp_slice_iter_multinomial <- function(A, D_codes, mu, mixed, kplus, kstar, kmin, ktrunc, counts, col_offset, n_alleles, log_prior_pad, prior_pad, r_totals, alpha, N) {
+    .Call(`_snp_slicer_cpp_slice_iter_multinomial`, A, D_codes, mu, mixed, kplus, kstar, kmin, ktrunc, counts, col_offset, n_alleles, log_prior_pad, prior_pad, r_totals, alpha, N)
 }
 
 cpp_update_s <- function(A, D, mu, ktrunc, alpha, rho, P) {

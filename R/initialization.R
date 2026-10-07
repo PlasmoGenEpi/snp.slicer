@@ -15,14 +15,24 @@ create_model <- function(
   
   # Extract additional parameters
   params <- list(...)
-  if (is.null(rho)) {
+  if (is.null(rho) && model != "multinomial") {
     polymorphic_obs <- !is.na(processed_data$y) & processed_data$y != processed_data$r
     rho <- sum(processed_data$y[polymorphic_obs], na.rm = TRUE) /
       sum(processed_data$r[polymorphic_obs], na.rm = TRUE)
   }
-  
+
   # Create model-specific object
-  if (model == "categorical") {
+  if (model == "multinomial") {
+    if (is.null(processed_data$counts_exp)) {
+      stop("The multinomial model needs multi-allelic processed data; ",
+           "pass a long-format data.frame or a read0/read1 list")
+    }
+    model_obj <- build_multinomial_model(
+      processed_data,
+      alpha = alpha,
+      dict_prior = or_null(params$dict_prior, "empirical")
+    )
+  } else if (model == "categorical") {
     e1 <- or_null(params$e1, 0.05)
     e2 <- or_null(params$e2, 0.05)
     llik_tab <- build_categorical_llik_tab(e1, e2)
@@ -291,7 +301,7 @@ slice_init <- function(state, model_obj) {
   
   # Expand matrices
   state$A <- cbind(state$A, 0)
-  state$D <- rbind(state$D, stats::runif(model_obj$P) < model_obj$rho)
+  state$D <- rbind(state$D, sample_dictionary_row(model_obj))
   state$ktrunc <- ncol(state$A)
   
   return(state)
