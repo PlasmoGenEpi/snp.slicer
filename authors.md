@@ -7,7 +7,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/plasmogenepi/snp.slicer/blob/main/inst/CITATION)
+[`inst/CITATION`](https://github.com/plasmogenepi/snp.slicer/blob/v1.0.0/inst/CITATION)
 
 Ju, Nianqiao, Liu, Jiawei, He, Qixin (2024). “SNP-slice Resolves Mixed
 Infections: Simultaneously Unveiling Strain Haplotypes and Linking Them
