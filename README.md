@@ -2,6 +2,7 @@
 
 [![R-CMD-check](https://github.com/PlasmoGenEpi/snp.slicer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlasmoGenEpi/snp.slicer/actions/workflows/R-CMD-check.yaml)
 
+Version 1.0.0
 
 This library provides an installable implementation of the original `snp-slice` [model](https://github.com/nianqiaoju/snp-slice). We have no affiliation with this author and provide this implementation as is.
 

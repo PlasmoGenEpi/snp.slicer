@@ -1,6 +1,6 @@
 Package: snp.slicer
 Title: Bayesian Nonparametric Resolution of Multi-Strain Infections
-Version: 0.1.0
+Version: 1.0.0
 Author: Nianqiao Ju [aut], Maxwell Murphy [cre], Alfred Hubbard [aut]
 Maintainer: Maxwell Murphy <maxwell.murphy@ucsf.edu>
 Authors@R: 
