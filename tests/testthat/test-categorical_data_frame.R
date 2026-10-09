@@ -100,3 +100,42 @@ test_that("validate_input_data rejects categorical data.frame with negative targ
     "cannot be negative"
   )
 })
+
+# Regression: the exception detector must classify proportions with the same
+# bin edges as the likelihood. llik_tab is -Inf at [prop bin 3, y == 0], and
+# bin 3 is `prop > 0.99` -- not `prop == 1`. Detecting with exact equality left
+# any proportion in (0.99, 1) unfixable, so initialization aborted after 10
+# no-op repair passes. Seen in the wild at 124/125 strains = 0.992.
+test_that("resolve_exceptions catches proportions in (0.99, 1), not just == 1", {
+  n_strain <- 125
+  # one specimen, one locus observed as reference (y == 0)
+  y <- matrix(0, nrow = 1, ncol = 1, dimnames = list("s1", "t1"))
+  # the specimen carries all 125 strains, of which 124 have the alt allele,
+  # so the proportion is 124/125 = 0.992 -- inside (0.99, 1)
+  D <- matrix(1, nrow = n_strain, ncol = 1)
+  D[n_strain, 1] <- 0
+  A <- matrix(1, nrow = 1, ncol = n_strain)
+
+  model_obj <- list(
+    y = y, N = 1L, P = 1L,
+    llik_tab = snp.slicer:::build_categorical_llik_tab(0.05, 0.05)
+  )
+  state <- list(A = A, D = D, kmin = 1L, mixed = 1L)
+  state$loglik <- snp.slicer:::categorical_loglikelihood_matrix(A, D, model_obj)
+
+  prop <- (A %*% D) / rowSums(A)
+  expect_gt(prop[1, 1], 0.99)      # in the offending window ...
+  expect_lt(prop[1, 1], 1)         # ... but not equal to 1
+  expect_true(is.infinite(state$loglik))
+
+  fixed <- snp.slicer:::categorical_resolve_exceptions(state, model_obj)
+  expect_false(is.infinite(fixed$loglik))
+})
+
+test_that("categorical_prop_bin_vec agrees with the scalar bin function", {
+  probs <- c(-0.1, 0, 0.001, 0.5, 0.99, 0.991, 0.999, 1)
+  expect_equal(
+    snp.slicer:::categorical_prop_bin_vec(probs),
+    vapply(probs, snp.slicer:::categorical_prop_bin, integer(1))
+  )
+})

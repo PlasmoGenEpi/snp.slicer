@@ -1,6 +1,6 @@
 Package: snp.slicer
 Title: Bayesian Nonparametric Resolution of Multi-Strain Infections
-Version: 0.1.0
+Version: 1.0.0
 Author: Nianqiao Ju [aut], Maxwell Murphy [cre], Alfred Hubbard [aut]
 Maintainer: Maxwell Murphy <maxwell.murphy@ucsf.edu>
 Authors@R: 
@@ -33,18 +33,23 @@ Imports:
     parallel,
     posterior,
     readr,
+    Rcpp,
     tidyr
+LinkingTo: Rcpp, RcppEigen
+SystemRequirements: C++17
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Suggests:
     devtools,
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
     ggplot2,
-    pkgdown
+    pkgdown,
+    Rcpp,
+    RcppEigen
 VignetteBuilder: knitr
 URL: https://github.com/plasmogenepi/snp.slicer, https://plasmogenepi.github.io/snp.slicer/
 BugReports: https://github.com/plasmogenepi/snp.slicer/issues
 Depends: 
     R (>= 4.2.0)
+Config/roxygen2/version: 8.0.0

@@ -2,23 +2,21 @@
 % Please edit documentation in R/slice_sampler.R
 \name{refresh_feature}
 \alias{refresh_feature}
-\title{Refresh feature with random dictionary}
+\title{Refresh feature with a dictionary row drawn from the prior}
 \usage{
-refresh_feature(state, k, rho, P)
+refresh_feature(state, k, model_obj)
 }
 \arguments{
 \item{state}{Current state}
 
 \item{k}{Feature index}
 
-\item{rho}{Dictionary sparsity parameter}
-
-\item{P}{Number of SNPs}
+\item{model_obj}{Model object; supplies the dictionary prior}
 }
 \value{
 Updated state
 }
 \description{
-Refresh feature with random dictionary
+Refresh feature with a dictionary row drawn from the prior
 }
 \keyword{internal}

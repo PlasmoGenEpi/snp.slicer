@@ -4,7 +4,7 @@
 \alias{categorical_loglikelihood_vector}
 \title{Log-likelihood for categorical model (vector version)}
 \usage{
-categorical_loglikelihood_vector(propvec, yvec, rvec = NULL)
+categorical_loglikelihood_vector(propvec, yvec, rvec = NULL, llik_tab = NULL)
 }
 \arguments{
 \item{propvec}{Proportion vector}

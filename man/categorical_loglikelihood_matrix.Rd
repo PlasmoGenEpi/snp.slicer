@@ -2,7 +2,7 @@
 % Please edit documentation in R/categorical.R
 \name{categorical_loglikelihood_matrix}
 \alias{categorical_loglikelihood_matrix}
-\title{Categorical Model for SNP-Slice}
+\title{Log-likelihood for categorical model (matrix version)}
 \usage{
 categorical_loglikelihood_matrix(A, D, model_obj)
 }
@@ -17,8 +17,6 @@ categorical_loglikelihood_matrix(A, D, model_obj)
 Log-likelihood value
 }
 \description{
-Implementation of the categorical observation model for SNP-Slice.
-This model handles categorical observations (0, 0.5, 1) with error parameters.
 Log-likelihood for categorical model (matrix version)
 }
 \keyword{internal}

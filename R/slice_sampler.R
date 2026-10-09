@@ -8,18 +8,53 @@
 #' @importFrom stats runif
 slice_iter <- function(state, model_obj) {
   start_timer("slice_iter")
-  
-  state <- slice_update_s(state, model_obj)
-  state <- slice_update_a(state, model_obj)
-  state <- slice_update_d(state, model_obj)
-  state <- slice_update_mu(state, model_obj)
-  
-  # Update log-likelihood and log-posterior
-  state$loglik <- model_obj$loglikelihood_matrix(state$A, state$D, model_obj)
-  state$logpost <- state$loglik + 
-                   logprior_a(state$A, state$mu, model_obj$alpha) + 
-                   logprior_mu(state$mu, model_obj$alpha, model_obj$N) + 
-                   logprior_d(state$D, model_obj$rho)
+
+  kernel <- model_obj$kernel
+  if (is.null(kernel)) {
+    kernel <- mcmc_kernel_r(model_obj)
+  }
+
+  if (identical(kernel$name, "cpp") && is.null(kernel$obs_code)) {
+    kernel <- kernel_with_obs_cache(kernel, model_obj)
+    model_obj$kernel <- kernel
+    model_obj$kernel_loglik_const <- kernel$obs_loglik_const
+    model_obj$kernel_obs_code <- kernel$obs_code
+  }
+
+  if (!is.null(kernel$update_iter)) {
+    start_timer("slice_update_iter")
+    state <- kernel$update_iter(state, model_obj)
+    end_timer("slice_update_iter")
+  } else {
+    state <- slice_update_s(state, model_obj)
+    state <- slice_update_a(state, model_obj)
+    state <- slice_update_d(state, model_obj)
+    state <- slice_update_mu(state, model_obj)
+  }
+
+  # Update log-likelihood and log-posterior. An adapter may supply its own
+  # compiled likelihood (the multinomial kernel does).
+  if (!is.null(kernel$loglik)) {
+    state$loglik <- as.numeric(kernel$loglik(state, model_obj))
+  } else if (identical(kernel$name, "cpp") && exists("cpp_loglik_total", where = asNamespace("snp.slicer"), inherits = FALSE)) {
+    obs <- kernel_obs_args(model_obj)
+    state$loglik <- as.numeric(cpp_loglik_total(
+      A = state$A,
+      D = state$D,
+      y = model_obj$y,
+      r = model_obj$r,
+      model_type = model_type_id(model_obj$name),
+      llik_tab = kernel_llik_tab(model_obj),
+      loglik_const = obs$loglik_const,
+      obs_code = obs$obs_code
+    ))
+  } else {
+    state$loglik <- model_obj$loglikelihood_matrix(state$A, state$D, model_obj)
+  }
+  state$logpost <- as.numeric(state$loglik) +
+                   logprior_a(state$A, state$mu, model_obj$alpha) +
+                   logprior_mu(state$mu, model_obj$alpha, model_obj$N) +
+                   dictionary_logprior(state$D, model_obj)
   
   end_timer("slice_iter")
   return(state)
@@ -35,39 +70,44 @@ slice_iter <- function(state, model_obj) {
 #' @importFrom stats runif
 slice_update_s <- function(state, model_obj) {
   start_timer("slice_update_s")
-  
-  # Sample auxiliary variable s
+  kernel <- model_obj$kernel
+  if (is.null(kernel)) {
+    kernel <- mcmc_kernel_r(model_obj)
+  }
+  state <- kernel$update_s(state, model_obj)
+  end_timer("slice_update_s")
+  return(state)
+}
+
+#' R reference implementation of slice-variable update
+#' @keywords internal
+slice_update_s_r <- function(state, model_obj) {
   mustar <- get_mustar(state$A, state$mu)
-  s <- mustar * stats::runif(1)  # 0 < s < mu[kstar]
-  
-  # Expand truncation level if needed
+  s <- mustar * stats::runif(1)
+
   k <- state$ktrunc
   while (s < state$mu[k]) {
-    # Sample new mu value using grid sampling
     munext <- gridsample(0, state$mu[k], logf_newfeature, model_obj$N, model_obj$alpha)
     state$mu <- c(state$mu, munext)
     k <- k + 1
   }
-  
-  # Expand A and D matrices if necessary
+
   if (state$ktrunc < length(state$mu)) {
     num_new_cols <- length(state$mu) - state$ktrunc
     state$A <- cbind(state$A, matrix(0, nrow = model_obj$N, ncol = num_new_cols))
     state$D <- rbind(state$D, matrix(0, ncol = model_obj$P, nrow = num_new_cols))
-    
-    # Refresh new features
+
     for (k in (state$ktrunc + 1):length(state$mu)) {
-      state <- refresh_feature(state, k, model_obj$rho, model_obj$P)
+      state <- refresh_feature(state, k, model_obj)
     }
   }
-  
+
   state$ktrunc <- length(state$mu)
   state$kplus <- which(state$mu < s)[1]
   if (is.na(state$kplus)) {
     state$kplus <- state$ktrunc
   }
-  
-  end_timer("slice_update_s")
+
   return(state)
 }
 
@@ -80,7 +120,18 @@ slice_update_s <- function(state, model_obj) {
 #' @keywords internal
 slice_update_a <- function(state, model_obj) {
   start_timer("slice_update_a")
+  kernel <- model_obj$kernel
+  if (is.null(kernel)) {
+    kernel <- mcmc_kernel_r(model_obj)
+  }
+  state <- kernel$update_a(state, model_obj)
+  end_timer("slice_update_a")
+  return(state)
+}
 
+#' R reference implementation of allocation-matrix updates
+#' @keywords internal
+slice_update_a_r <- function(state, model_obj) {
   kstar <- state$kstar
 
   for (i in state$mixed) {
@@ -104,8 +155,6 @@ slice_update_a <- function(state, model_obj) {
     }
   }
   state$kstar <- kstar
-
-  end_timer("slice_update_a")
   return(state)
 }
 
@@ -182,8 +231,18 @@ slice_update_a_local <- function(state, i, k, model_obj,
 #' @keywords internal
 slice_update_d <- function(state, model_obj) {
   start_timer("slice_update_d")
+  kernel <- model_obj$kernel
+  if (is.null(kernel)) {
+    kernel <- mcmc_kernel_r(model_obj)
+  }
+  state <- kernel$update_d(state, model_obj)
+  end_timer("slice_update_d")
+  return(state)
+}
 
-  # Row sums of A are unchanged during D updates; compute once
+#' R reference implementation of dictionary-matrix updates
+#' @keywords internal
+slice_update_d_r <- function(state, model_obj) {
   an <- rowSums(state$A)
 
   for (k in state$kmin:state$kstar) {
@@ -194,7 +253,6 @@ slice_update_d <- function(state, model_obj) {
     }
   }
 
-  end_timer("slice_update_d")
   return(state)
 }
 
@@ -250,7 +308,18 @@ slice_update_d_local <- function(state, k, p, model_obj, an = NULL, ad0 = NULL) 
 #' @keywords internal
 slice_update_mu <- function(state, model_obj) {
   start_timer("slice_update_mu")
-  
+  kernel <- model_obj$kernel
+  if (is.null(kernel)) {
+    kernel <- mcmc_kernel_r(model_obj)
+  }
+  state <- kernel$update_mu(state, model_obj)
+  end_timer("slice_update_mu")
+  return(state)
+}
+
+#' R reference implementation of stick-breaking weight updates
+#' @keywords internal
+slice_update_mu_r <- function(state, model_obj) {
   m <- get_m(state$A)
   
   # Update mu[1] (first stick)
@@ -283,8 +352,7 @@ slice_update_mu <- function(state, model_obj) {
       state$mu[k] <- 0.5  # Default value
     }
   }
-  
-  end_timer("slice_update_mu")
+
   return(state)
 }
 
@@ -381,18 +449,49 @@ logf_oldfeature <- function(x, m, N) {
   return((m - 1) * log(x) + (N - m) * log(1 - x))
 }
 
-#' Refresh feature with random dictionary
+#' Refresh feature with a dictionary row drawn from the prior
 #'
 #' @param state Current state
 #' @param k Feature index
-#' @param rho Dictionary sparsity parameter
-#' @param P Number of SNPs
+#' @param model_obj Model object; supplies the dictionary prior
 #'
 #' @return Updated state
 #' @keywords internal
-#' @importFrom stats runif
-refresh_feature <- function(state, k, rho, P) {
+refresh_feature <- function(state, k, model_obj) {
   state$A[, k] <- 0
-  state$D[k, ] <- (stats::runif(P) < rho)
+  state$D[k, ] <- sample_dictionary_row(model_obj)
   return(state)
+}
+
+#' Draw one dictionary row from the model's prior
+#'
+#' Models that define \code{sample_dict_row} (the multinomial model) draw
+#' allele codes from their per-target priors; every other model draws
+#' independent Bernoulli(\code{rho}) bits.
+#'
+#' @param model_obj Model object
+#' @return Numeric vector of length \code{model_obj$P}
+#' @keywords internal
+#' @importFrom stats runif
+sample_dictionary_row <- function(model_obj) {
+  if (!is.null(model_obj$sample_dict_row)) {
+    return(as.numeric(model_obj$sample_dict_row(model_obj)))
+  }
+  as.numeric(stats::runif(model_obj$P) < model_obj$rho)
+}
+
+#' Log prior of the dictionary under the model's prior
+#'
+#' Dispatches to \code{model_obj$logprior_d} when the model defines one and to
+#' the Bernoulli(\code{rho}) prior in \code{\link{logprior_d}} otherwise.
+#'
+#' @param D Dictionary matrix
+#' @param model_obj Model object
+#' @return Log prior probability
+#' @keywords internal
+dictionary_logprior <- function(D, model_obj) {
+  if (!is.null(model_obj$logprior_d)) {
+    return(model_obj$logprior_d(D, model_obj))
+  }
+  logprior_d(D, model_obj$rho)
 }

@@ -1,0 +1,81 @@
+# R CMD check (runs the testthat suite) on macOS, Windows and Ubuntu (R devel/release/oldrel-1).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+name: R-CMD-check
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    # Ceilings stop a hung setup from holding a runner for 6 hours. R devel has no
+    # binary packages, so a cold cache compiles everything and needs longer limits.
+    timeout-minutes: ${{ matrix.config.job-timeout || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: macos-latest,   r: 'release'}
+          - {os: windows-latest, r: 'release'}
+          - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release',
+             deps-timeout: 60, job-timeout: 75}
+          - {os: ubuntu-latest,  r: 'release'}
+          - {os: ubuntu-latest,  r: 'oldrel-1'}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      MAKEFLAGS: -j4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        timeout-minutes: 10
+        with:
+          r-version: ${{ matrix.config.r }}
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
+          # Default is Ncpus = 1, which installs dependencies serially.
+          Ncpus: 4
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        timeout-minutes: ${{ matrix.config.deps-timeout || 25 }}
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+
+  # _pkgdown.yml is in .Rbuildignore, so R CMD check never sees it. Validate it here
+  # rather than finding out when a tag triggers the site deploy.
+  pkgdown-config:
+    runs-on: ubuntu-latest
+    name: pkgdown config
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # check_pkgdown() renders vignette titles through pandoc.
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        timeout-minutes: 10
+        with:
+          use-public-rspm: true
+
+      - name: Install pkgdown
+        run: install.packages("pkgdown")
+        shell: Rscript {0}
+
+      - name: Check _pkgdown.yml against the package
+        run: pkgdown::check_pkgdown()
+        shell: Rscript {0}
