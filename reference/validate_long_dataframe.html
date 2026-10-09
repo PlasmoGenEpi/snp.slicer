@@ -19,7 +19,7 @@ guarantees the key columns are present before this is called."><meta property="o
 
     <a class="navbar-brand me-2" href="../index.html">snp.slicer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -59,7 +59,7 @@ guarantees the key columns are present before this is called.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_long_dataframe</span><span class="op">(</span><span class="va">data</span>, <span class="va">params</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_long_dataframe</span><span class="op">(</span><span class="va">data</span>, <span class="va">params</span>, model <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -73,6 +73,12 @@ guarantees the key columns are present before this is called.</p>
 <dt id="arg-params">params<a class="anchor" aria-label="anchor" href="#arg-params"></a></dt>
 <dd><p>List of resolved column names with elements
 <code>specimen_id_col</code>, <code>target_id_col</code>, <code>target_value_col</code>.</p></dd>
+
+
+<dt id="arg-model">model<a class="anchor" aria-label="anchor" href="#arg-model"></a></dt>
+<dd><p>Model name. The multinomial model keeps targets with any
+number of alleles, so it only needs one polymorphic target (two or more
+observed alleles); every other model needs a biallelic one.</p></dd>
 
 </dl></div>
     <div class="section level2">

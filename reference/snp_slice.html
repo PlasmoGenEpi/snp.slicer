@@ -11,7 +11,7 @@ unveils strain haplotypes and links them to hosts from sequencing data."><meta p
 
     <a class="navbar-brand me-2" href="../index.html">snp.slicer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -71,7 +71,9 @@ unveils strain haplotypes and links them to hosts from sequencing data.</p>
 <span></span>
 <span><span class="fu">snp_slice_binomial</span><span class="op">(</span><span class="va">data</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">snp_slice_negative_binomial</span><span class="op">(</span><span class="va">data</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">snp_slice_negative_binomial</span><span class="op">(</span><span class="va">data</span>, <span class="va">...</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">snp_slice_multinomial</span><span class="op">(</span><span class="va">data</span>, dict_prior <span class="op">=</span> <span class="st">"empirical"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -89,8 +91,11 @@ inputs (e.g. <code>*_cat.txt</code>) remain supported.</p></dd>
 
 
 <dt id="arg-model">model<a class="anchor" aria-label="anchor" href="#arg-model"></a></dt>
-<dd><p>Observation model to use. Options: "categorical", "poisson", "binomial",
-"negative_binomial" (default).</p></dd>
+<dd><p>Observation model to use. One of <code>"categorical"</code>,
+<code>"poisson"</code>, <code>"binomial"</code>, <code>"negative_binomial"</code>
+(default), or <code>"multinomial"</code>. Only the multinomial model keeps
+targets with more than two alleles; the others drop them. See
+‘The multinomial model’ below.</p></dd>
 
 
 <dt id="arg-n-sample">n_sample<a class="anchor" aria-label="anchor" href="#arg-n-sample"></a></dt>
@@ -162,6 +167,11 @@ Only post-burn-in iterations are stored.</p></dd>
 <dt id="arg-e-">e2<a class="anchor" aria-label="anchor" href="#arg-e-"></a></dt>
 <dd><p>Error parameter for categorical model (default: 0.05)</p></dd>
 
+
+<dt id="arg-dict-prior">dict_prior<a class="anchor" aria-label="anchor" href="#arg-dict-prior"></a></dt>
+<dd><p>Dictionary prior for the multinomial model; see
+<code>model</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -177,6 +187,33 @@ chain's MAP estimate (<code>map_allocation_matrix</code> (A), <code>map_dictiona
 <code><a href="get_chain.html">get_chain()</a></code>, which defaults to the best chain, or with
 <code><a href="extract_allocations.html">extract_allocations()</a></code> / <code><a href="extract_strains.html">extract_strains()</a></code>; every diagnostic function
 also takes a <code>chain</code> argument. <code><a href="compare_chains.html">compare_chains()</a></code> summarises all chains.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="the-multinomial-model">The multinomial model<a class="anchor" aria-label="anchor" href="#the-multinomial-model"></a></h2>
+
+
+<p>The other models describe a target with a single number per specimen: the
+dictionary is binary, so <code>(A %*% D) / rowSums(A)</code> gives the fraction of a
+specimen's strains carrying the alternate allele, and the reference allele is
+whatever is left over. That only works for two alleles, so targets with more
+are dropped.</p>
+<p>The multinomial model instead describes a target with a probability
+<em>vector</em>, one entry per allele. The dictionary holds an allele code per
+strain per target rather than a bit; expanding it to one indicator column per
+(target, allele) pair makes each entry of
+<code>(A %*% Dx) / rowSums(A)</code> the fraction of a specimen's strains carrying
+that allele, and the entries for one target sum to one. The observed read
+counts across a target's alleles are then multinomial in that vector. Nothing
+limits the vector's length, so every allele at every target is kept.</p>
+<p>With exactly two alleles the vector is <code>(1 - p, p)</code> and the kernel reduces
+to the binomial one, so the two models agree on biallelic data.</p>
+<p>Parameters read from <code>...</code>: <code>dict_prior</code> sets the per-target
+categorical prior on dictionary entries, either <code>"empirical"</code> (default;
+pooled allele read fractions with a pseudocount of one), <code>"uniform"</code>, or
+a list of per-target probability vectors. <code>rho</code>, used by the count
+models, does not apply.</p>
+<p>Implementation: the allocation update runs in compiled code as for the other
+models, while the dictionary update is an R Gibbs step over alleles.</p>
     </div>
 
     <div class="section level2">

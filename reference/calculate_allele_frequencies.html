@@ -11,7 +11,7 @@ allele combination across all individuals based on their strain allocations."><m
 
     <a class="navbar-brand me-2" href="../index.html">snp.slicer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -134,14 +134,14 @@ computed from the distribution of allele frequencies across MCMC samples.</p>
 <span class="r-in"><span><span class="va">allele_freqs</span> <span class="op">&lt;-</span> <span class="fu">calculate_allele_frequencies</span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">allele_freqs</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        allele   frequency count total_parasites</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8 ref|ref|ref 0.634285714   333             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 ref|alt|alt 0.135238095    71             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 alt|ref|alt 0.091428571    48             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 ref|ref|alt 0.074285714    39             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 alt|ref|ref 0.036190476    19             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 ref|alt|ref 0.017142857     9             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 alt|alt|alt 0.005714286     3             525</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alt|alt|ref 0.005714286     3             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8 alt|alt|alt 0.634285714   333             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 alt|ref|ref 0.135238095    71             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 ref|alt|ref 0.091428571    48             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alt|alt|ref 0.074285714    39             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 ref|alt|alt 0.036190476    19             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alt|ref|alt 0.017142857     9             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 ref|ref|ref 0.005714286     3             525</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 ref|ref|alt 0.005714286     3             525</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Posterior: mean, SD, credible interval, and per-sample mean count</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="get_chain.html">get_chain</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
@@ -149,23 +149,23 @@ computed from the distribution of allele frequencies across MCMC samples.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">allele_freqs_post</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                  allele   frequency frequency_sd frequency_lower</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|ref ref|ref|ref 0.634097532  0.002736118    0.6310209453</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|alt ref|alt|alt 0.138035001  0.005609773    0.1246050259</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|alt alt|ref|alt 0.082391717  0.009436347    0.0665684411</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|alt ref|ref|alt 0.073155009  0.004944094    0.0665684411</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|ref alt|ref|ref 0.042251963  0.007466272    0.0322245146</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|ref ref|alt|ref 0.014464276  0.002814664    0.0095278989</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|alt alt|alt|alt 0.007971928  0.006295963    0.0004261364</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|ref alt|alt|ref 0.007632574  0.003088536    0.0019108694</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|alt alt|alt|alt 0.634097532  0.002736118    0.6310209453</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|ref alt|ref|ref 0.138035001  0.005609773    0.1246050259</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|ref ref|alt|ref 0.082391717  0.009436347    0.0665684411</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|ref alt|alt|ref 0.073155009  0.004944094    0.0665684411</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|alt ref|alt|alt 0.042251963  0.007466272    0.0322245146</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|alt alt|ref|alt 0.014464276  0.002814664    0.0095278989</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|ref ref|ref|ref 0.007971928  0.006295963    0.0004261364</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|alt ref|ref|alt 0.007632574  0.003088536    0.0019108694</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             frequency_upper mean_count n_samples</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|ref      0.63884162     332.32        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|alt      0.14621117      72.34        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|alt      0.09871358      43.18        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|alt      0.08405791      38.34        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|ref      0.04961832      22.14        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|ref      0.01915281       7.58        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|alt      0.01869025       4.18        50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|ref      0.01486616       4.00        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|alt      0.63884162     332.32        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|ref      0.14621117      72.34        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|ref      0.09871358      43.18        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|alt|ref      0.08405791      38.34        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|alt|alt      0.04961832      22.14        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alt|ref|alt      0.01915281       7.58        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|ref      0.01869025       4.18        50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ref|ref|alt      0.01486616       4.00        50</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

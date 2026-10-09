@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">snp.slicer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -220,12 +220,12 @@ does not depend on how many MCMC samples were used.</p>
 <span><span class="va">allele_freqs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_allele_frequencies.html">calculate_allele_frequencies</a></span><span class="op">(</span><span class="va">result</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        allele  frequency count total_parasites</span></span>
-<span><span class="co">#&gt; 8 ref|ref|ref 0.63428571   333             525</span></span>
-<span><span class="co">#&gt; 2 ref|alt|alt 0.13523810    71             525</span></span>
-<span><span class="co">#&gt; 3 alt|ref|alt 0.09142857    48             525</span></span>
-<span><span class="co">#&gt; 4 ref|ref|alt 0.07428571    39             525</span></span>
-<span><span class="co">#&gt; 7 alt|ref|ref 0.03619048    19             525</span></span>
-<span><span class="co">#&gt; 6 ref|alt|ref 0.01714286     9             525</span></span>
+<span><span class="co">#&gt; 8 alt|alt|alt 0.63428571   333             525</span></span>
+<span><span class="co">#&gt; 2 alt|ref|ref 0.13523810    71             525</span></span>
+<span><span class="co">#&gt; 3 ref|alt|ref 0.09142857    48             525</span></span>
+<span><span class="co">#&gt; 4 alt|alt|ref 0.07428571    39             525</span></span>
+<span><span class="co">#&gt; 7 ref|alt|alt 0.03619048    19             525</span></span>
+<span><span class="co">#&gt; 6 alt|ref|alt 0.01714286     9             525</span></span>
 <span></span>
 <span><span class="co"># Posterior: mean, SD, credible interval, and sample-size-invariant mean_count</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_chain.html">get_chain</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">$</span><span class="va">mcmc_samples</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -233,19 +233,19 @@ does not depend on how many MCMC samples were used.</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">allele_freqs_post</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt;                  allele  frequency frequency_sd frequency_lower frequency_upper</span></span>
-<span><span class="co">#&gt; ref|ref|ref ref|ref|ref 0.63409753  0.002736118     0.631020945      0.63884162</span></span>
-<span><span class="co">#&gt; ref|alt|alt ref|alt|alt 0.13803500  0.005609773     0.124605026      0.14621117</span></span>
-<span><span class="co">#&gt; alt|ref|alt alt|ref|alt 0.08239172  0.009436347     0.066568441      0.09871358</span></span>
-<span><span class="co">#&gt; ref|ref|alt ref|ref|alt 0.07315501  0.004944094     0.066568441      0.08405791</span></span>
-<span><span class="co">#&gt; alt|ref|ref alt|ref|ref 0.04225196  0.007466272     0.032224515      0.04961832</span></span>
-<span><span class="co">#&gt; ref|alt|ref ref|alt|ref 0.01446428  0.002814664     0.009527899      0.01915281</span></span>
+<span><span class="co">#&gt; alt|alt|alt alt|alt|alt 0.63409753  0.002736118     0.631020945      0.63884162</span></span>
+<span><span class="co">#&gt; alt|ref|ref alt|ref|ref 0.13803500  0.005609773     0.124605026      0.14621117</span></span>
+<span><span class="co">#&gt; ref|alt|ref ref|alt|ref 0.08239172  0.009436347     0.066568441      0.09871358</span></span>
+<span><span class="co">#&gt; alt|alt|ref alt|alt|ref 0.07315501  0.004944094     0.066568441      0.08405791</span></span>
+<span><span class="co">#&gt; ref|alt|alt ref|alt|alt 0.04225196  0.007466272     0.032224515      0.04961832</span></span>
+<span><span class="co">#&gt; alt|ref|alt alt|ref|alt 0.01446428  0.002814664     0.009527899      0.01915281</span></span>
 <span><span class="co">#&gt;             mean_count n_samples</span></span>
-<span><span class="co">#&gt; ref|ref|ref     332.32        50</span></span>
-<span><span class="co">#&gt; ref|alt|alt      72.34        50</span></span>
-<span><span class="co">#&gt; alt|ref|alt      43.18        50</span></span>
-<span><span class="co">#&gt; ref|ref|alt      38.34        50</span></span>
-<span><span class="co">#&gt; alt|ref|ref      22.14        50</span></span>
-<span><span class="co">#&gt; ref|alt|ref       7.58        50</span></span>
+<span><span class="co">#&gt; alt|alt|alt     332.32        50</span></span>
+<span><span class="co">#&gt; alt|ref|ref      72.34        50</span></span>
+<span><span class="co">#&gt; ref|alt|ref      43.18        50</span></span>
+<span><span class="co">#&gt; alt|alt|ref      38.34        50</span></span>
+<span><span class="co">#&gt; ref|alt|alt      22.14        50</span></span>
+<span><span class="co">#&gt; alt|ref|alt       7.58        50</span></span>
 <span></span>
 <span><span class="co"># Multiple target sets: pass a named list for one table per set</span></span>
 <span><span class="va">target_sets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
@@ -257,10 +257,10 @@ does not depend on how many MCMC samples were used.</p>
 <span><span class="co"># Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">freqs_by_set</span><span class="op">$</span><span class="va">locus_a</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    allele  frequency count total_parasites</span></span>
-<span><span class="co">#&gt; 4 ref|ref 0.70857143   372             525</span></span>
-<span><span class="co">#&gt; 2 ref|alt 0.15238095    80             525</span></span>
-<span><span class="co">#&gt; 3 alt|ref 0.12761905    67             525</span></span>
-<span><span class="co">#&gt; 1 alt|alt 0.01142857     6             525</span></span></code></pre></div>
+<span><span class="co">#&gt; 4 alt|alt 0.70857143   372             525</span></span>
+<span><span class="co">#&gt; 2 alt|ref 0.15238095    80             525</span></span>
+<span><span class="co">#&gt; 3 ref|alt 0.12761905    67             525</span></span>
+<span><span class="co">#&gt; 1 ref|ref 0.01142857     6             525</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="individual-coi-with-uncertainty">Individual COI with uncertainty<a class="anchor" aria-label="anchor" href="#individual-coi-with-uncertainty"></a>

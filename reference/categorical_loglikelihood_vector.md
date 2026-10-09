@@ -5,7 +5,7 @@ Log-likelihood for categorical model (vector version)
 ## Usage
 
 ``` r
-categorical_loglikelihood_vector(propvec, yvec, rvec = NULL)
+categorical_loglikelihood_vector(propvec, yvec, rvec = NULL, llik_tab = NULL)
 ```
 
 ## Arguments

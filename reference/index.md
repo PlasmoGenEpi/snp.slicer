@@ -45,6 +45,7 @@
   [`snp_slice_poisson()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   [`snp_slice_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   [`snp_slice_negative_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_multinomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   : Bayesian Nonparametric Resolution of Multi-Strain Infections
 - [`summary(`*`<snp_slice_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/summary.snp_slice_results.md)
   : Print summary of SNP-Slice results

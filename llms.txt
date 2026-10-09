@@ -1,5 +1,9 @@
 # SNP-Slice: Bayesian Nonparametric Resolution of Multi-Strain Infections
 
+[![R-CMD-check](https://github.com/PlasmoGenEpi/snp.slicer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlasmoGenEpi/snp.slicer/actions/workflows/R-CMD-check.yaml)
+
+Version 1.0.0
+
 This library provides an installable implementation of the original
 `snp-slice` [model](https://github.com/nianqiaoju/snp-slice). We have no
 affiliation with this author and provide this implementation as is.
@@ -103,6 +107,7 @@ This package is licensed under the GPL-3 License.
   [`snp_slice_poisson()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   [`snp_slice_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   [`snp_slice_negative_binomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
+  [`snp_slice_multinomial()`](https://plasmogenepi.github.io/snp.slicer/reference/snp_slice.md)
   : Bayesian Nonparametric Resolution of Multi-Strain Infections
 - [`summary(`*`<snp_slice_results>`*`)`](https://plasmogenepi.github.io/snp.slicer/reference/summary.snp_slice_results.md)
   : Print summary of SNP-Slice results

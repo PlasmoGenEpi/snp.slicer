@@ -14,7 +14,7 @@ guarantees the key columns are present before this is called.
 ## Usage
 
 ``` r
-validate_long_dataframe(data, params)
+validate_long_dataframe(data, params, model = NULL)
 ```
 
 ## Arguments
@@ -27,6 +27,12 @@ validate_long_dataframe(data, params)
 
   List of resolved column names with elements `specimen_id_col`,
   `target_id_col`, `target_value_col`.
+
+- model:
+
+  Model name. The multinomial model keeps targets with any number of
+  alleles, so it only needs one polymorphic target (two or more observed
+  alleles); every other model needs a biallelic one.
 
 ## Value
 

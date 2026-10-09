@@ -33,6 +33,8 @@ snp_slice_poisson(data, ...)
 snp_slice_binomial(data, ...)
 
 snp_slice_negative_binomial(data, ...)
+
+snp_slice_multinomial(data, dict_prior = "empirical", ...)
 ```
 
 ## Arguments
@@ -50,8 +52,10 @@ snp_slice_negative_binomial(data, ...)
 
 - model:
 
-  Observation model to use. Options: "categorical", "poisson",
-  "binomial", "negative_binomial" (default).
+  Observation model to use. One of `"categorical"`, `"poisson"`,
+  `"binomial"`, `"negative_binomial"` (default), or `"multinomial"`.
+  Only the multinomial model keeps targets with more than two alleles;
+  the others drop them. See ‘The multinomial model’ below.
 
 - n_sample:
 
@@ -124,6 +128,10 @@ snp_slice_negative_binomial(data, ...)
 
   Error parameter for categorical model (default: 0.05)
 
+- dict_prior:
+
+  Dictionary prior for the multinomial model; see `model`.
+
 ## Value
 
 An object of class `snp_slice_results` containing:
@@ -150,6 +158,37 @@ which defaults to the best chain, or with
 every diagnostic function also takes a `chain` argument.
 [`compare_chains()`](https://plasmogenepi.github.io/snp.slicer/reference/compare_chains.md)
 summarises all chains.
+
+## The multinomial model
+
+The other models describe a target with a single number per specimen:
+the dictionary is binary, so `(A %*% D) / rowSums(A)` gives the fraction
+of a specimen's strains carrying the alternate allele, and the reference
+allele is whatever is left over. That only works for two alleles, so
+targets with more are dropped.
+
+The multinomial model instead describes a target with a probability
+*vector*, one entry per allele. The dictionary holds an allele code per
+strain per target rather than a bit; expanding it to one indicator
+column per (target, allele) pair makes each entry of
+`(A %*% Dx) / rowSums(A)` the fraction of a specimen's strains carrying
+that allele, and the entries for one target sum to one. The observed
+read counts across a target's alleles are then multinomial in that
+vector. Nothing limits the vector's length, so every allele at every
+target is kept.
+
+With exactly two alleles the vector is `(1 - p, p)` and the kernel
+reduces to the binomial one, so the two models agree on biallelic data.
+
+Parameters read from `...`: `dict_prior` sets the per-target categorical
+prior on dictionary entries, either `"empirical"` (default; pooled
+allele read fractions with a pseudocount of one), `"uniform"`, or a list
+of per-target probability vectors. `rho`, used by the count models, does
+not apply.
+
+Implementation: the allocation update runs in compiled code as for the
+other models, while the dictionary update is an R Gibbs step over
+alleles.
 
 ## Examples
 

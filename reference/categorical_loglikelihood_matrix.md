@@ -1,8 +1,6 @@
-# Categorical Model for SNP-Slice
+# Log-likelihood for categorical model (matrix version)
 
-Implementation of the categorical observation model for SNP-Slice. This
-model handles categorical observations (0, 0.5, 1) with error
-parameters. Log-likelihood for categorical model (matrix version)
+Log-likelihood for categorical model (matrix version)
 
 ## Usage
 

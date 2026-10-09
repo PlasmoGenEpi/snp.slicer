@@ -50,8 +50,8 @@ target_sets <- list(locus_a = c(1, 5), locus_b = c(10))
 freqs <- calculate_allele_frequencies_by_sets(result, target_sets)
 print(freqs$locus_a)
 #>    allele  frequency count total_parasites
-#> 4 ref|ref 0.70857143   372             525
-#> 2 ref|alt 0.15238095    80             525
-#> 3 alt|ref 0.12761905    67             525
-#> 1 alt|alt 0.01142857     6             525
+#> 4 alt|alt 0.70857143   372             525
+#> 2 alt|ref 0.15238095    80             525
+#> 3 ref|alt 0.12761905    67             525
+#> 1 ref|ref 0.01142857     6             525
 ```

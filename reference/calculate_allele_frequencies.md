@@ -107,14 +107,14 @@ result <- load_example_results()
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 print(allele_freqs)
 #>        allele   frequency count total_parasites
-#> 8 ref|ref|ref 0.634285714   333             525
-#> 2 ref|alt|alt 0.135238095    71             525
-#> 3 alt|ref|alt 0.091428571    48             525
-#> 4 ref|ref|alt 0.074285714    39             525
-#> 7 alt|ref|ref 0.036190476    19             525
-#> 6 ref|alt|ref 0.017142857     9             525
-#> 1 alt|alt|alt 0.005714286     3             525
-#> 5 alt|alt|ref 0.005714286     3             525
+#> 8 alt|alt|alt 0.634285714   333             525
+#> 2 alt|ref|ref 0.135238095    71             525
+#> 3 ref|alt|ref 0.091428571    48             525
+#> 4 alt|alt|ref 0.074285714    39             525
+#> 7 ref|alt|alt 0.036190476    19             525
+#> 6 alt|ref|alt 0.017142857     9             525
+#> 1 ref|ref|ref 0.005714286     3             525
+#> 5 ref|ref|alt 0.005714286     3             525
 
 # Posterior: mean, SD, credible interval, and per-sample mean count
 if (!is.null(get_chain(result)$mcmc_samples)) {
@@ -122,21 +122,21 @@ if (!is.null(get_chain(result)$mcmc_samples)) {
   print(allele_freqs_post)
 }
 #>                  allele   frequency frequency_sd frequency_lower
-#> ref|ref|ref ref|ref|ref 0.634097532  0.002736118    0.6310209453
-#> ref|alt|alt ref|alt|alt 0.138035001  0.005609773    0.1246050259
-#> alt|ref|alt alt|ref|alt 0.082391717  0.009436347    0.0665684411
-#> ref|ref|alt ref|ref|alt 0.073155009  0.004944094    0.0665684411
-#> alt|ref|ref alt|ref|ref 0.042251963  0.007466272    0.0322245146
-#> ref|alt|ref ref|alt|ref 0.014464276  0.002814664    0.0095278989
-#> alt|alt|alt alt|alt|alt 0.007971928  0.006295963    0.0004261364
-#> alt|alt|ref alt|alt|ref 0.007632574  0.003088536    0.0019108694
+#> alt|alt|alt alt|alt|alt 0.634097532  0.002736118    0.6310209453
+#> alt|ref|ref alt|ref|ref 0.138035001  0.005609773    0.1246050259
+#> ref|alt|ref ref|alt|ref 0.082391717  0.009436347    0.0665684411
+#> alt|alt|ref alt|alt|ref 0.073155009  0.004944094    0.0665684411
+#> ref|alt|alt ref|alt|alt 0.042251963  0.007466272    0.0322245146
+#> alt|ref|alt alt|ref|alt 0.014464276  0.002814664    0.0095278989
+#> ref|ref|ref ref|ref|ref 0.007971928  0.006295963    0.0004261364
+#> ref|ref|alt ref|ref|alt 0.007632574  0.003088536    0.0019108694
 #>             frequency_upper mean_count n_samples
-#> ref|ref|ref      0.63884162     332.32        50
-#> ref|alt|alt      0.14621117      72.34        50
-#> alt|ref|alt      0.09871358      43.18        50
-#> ref|ref|alt      0.08405791      38.34        50
-#> alt|ref|ref      0.04961832      22.14        50
-#> ref|alt|ref      0.01915281       7.58        50
-#> alt|alt|alt      0.01869025       4.18        50
-#> alt|alt|ref      0.01486616       4.00        50
+#> alt|alt|alt      0.63884162     332.32        50
+#> alt|ref|ref      0.14621117      72.34        50
+#> ref|alt|ref      0.09871358      43.18        50
+#> alt|alt|ref      0.08405791      38.34        50
+#> ref|alt|alt      0.04961832      22.14        50
+#> alt|ref|alt      0.01915281       7.58        50
+#> ref|ref|ref      0.01869025       4.18        50
+#> ref|ref|alt      0.01486616       4.00        50
 ```

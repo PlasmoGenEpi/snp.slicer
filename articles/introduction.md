@@ -153,12 +153,12 @@ not depend on how many MCMC samples were used.
 allele_freqs <- calculate_allele_frequencies(result, c(1, 5, 10))
 head(allele_freqs)
 #>        allele  frequency count total_parasites
-#> 8 ref|ref|ref 0.63428571   333             525
-#> 2 ref|alt|alt 0.13523810    71             525
-#> 3 alt|ref|alt 0.09142857    48             525
-#> 4 ref|ref|alt 0.07428571    39             525
-#> 7 alt|ref|ref 0.03619048    19             525
-#> 6 ref|alt|ref 0.01714286     9             525
+#> 8 alt|alt|alt 0.63428571   333             525
+#> 2 alt|ref|ref 0.13523810    71             525
+#> 3 ref|alt|ref 0.09142857    48             525
+#> 4 alt|alt|ref 0.07428571    39             525
+#> 7 ref|alt|alt 0.03619048    19             525
+#> 6 alt|ref|alt 0.01714286     9             525
 
 # Posterior: mean, SD, credible interval, and sample-size-invariant mean_count
 if (!is.null(get_chain(result)$mcmc_samples)) {
@@ -166,19 +166,19 @@ if (!is.null(get_chain(result)$mcmc_samples)) {
   head(allele_freqs_post)
 }
 #>                  allele  frequency frequency_sd frequency_lower frequency_upper
-#> ref|ref|ref ref|ref|ref 0.63409753  0.002736118     0.631020945      0.63884162
-#> ref|alt|alt ref|alt|alt 0.13803500  0.005609773     0.124605026      0.14621117
-#> alt|ref|alt alt|ref|alt 0.08239172  0.009436347     0.066568441      0.09871358
-#> ref|ref|alt ref|ref|alt 0.07315501  0.004944094     0.066568441      0.08405791
-#> alt|ref|ref alt|ref|ref 0.04225196  0.007466272     0.032224515      0.04961832
-#> ref|alt|ref ref|alt|ref 0.01446428  0.002814664     0.009527899      0.01915281
+#> alt|alt|alt alt|alt|alt 0.63409753  0.002736118     0.631020945      0.63884162
+#> alt|ref|ref alt|ref|ref 0.13803500  0.005609773     0.124605026      0.14621117
+#> ref|alt|ref ref|alt|ref 0.08239172  0.009436347     0.066568441      0.09871358
+#> alt|alt|ref alt|alt|ref 0.07315501  0.004944094     0.066568441      0.08405791
+#> ref|alt|alt ref|alt|alt 0.04225196  0.007466272     0.032224515      0.04961832
+#> alt|ref|alt alt|ref|alt 0.01446428  0.002814664     0.009527899      0.01915281
 #>             mean_count n_samples
-#> ref|ref|ref     332.32        50
-#> ref|alt|alt      72.34        50
-#> alt|ref|alt      43.18        50
-#> ref|ref|alt      38.34        50
-#> alt|ref|ref      22.14        50
-#> ref|alt|ref       7.58        50
+#> alt|alt|alt     332.32        50
+#> alt|ref|ref      72.34        50
+#> ref|alt|ref      43.18        50
+#> alt|alt|ref      38.34        50
+#> ref|alt|alt      22.14        50
+#> alt|ref|alt       7.58        50
 
 # Multiple target sets: pass a named list for one table per set
 target_sets <- list(
@@ -190,10 +190,10 @@ freqs_by_set <- calculate_allele_frequencies_by_sets(result, target_sets)
 # Each element is a frequency table (point estimate: allele, frequency, count, total_parasites; posterior: adds frequency_sd, frequency_lower, frequency_upper, mean_count, n_samples)
 print(freqs_by_set$locus_a)
 #>    allele  frequency count total_parasites
-#> 4 ref|ref 0.70857143   372             525
-#> 2 ref|alt 0.15238095    80             525
-#> 3 alt|ref 0.12761905    67             525
-#> 1 alt|alt 0.01142857     6             525
+#> 4 alt|alt 0.70857143   372             525
+#> 2 alt|ref 0.15238095    80             525
+#> 3 ref|alt 0.12761905    67             525
+#> 1 ref|ref 0.01142857     6             525
 ```
 
 ### Individual COI with uncertainty
