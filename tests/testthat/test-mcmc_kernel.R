@@ -550,3 +550,13 @@ test_that("snp_slice runs with the compiled kernel on zero-coverage cells", {
                       n_sample = 10, n_burnin = 5, seed = 2, verbose = FALSE)
   expect_true(is.finite(result$chains[[1]]$diagnostics$final_logpost))
 })
+
+test_that("logprior_a equals the elementwise Bernoulli log prior", {
+  set.seed(21L)
+  A <- matrix(as.numeric(stats::runif(15 * 6) < 0.4), nrow = 15, ncol = 6)
+  A[, 6] <- 0
+  mu <- sort(stats::runif(6, 0.01, 0.9), decreasing = TRUE)
+
+  elementwise <- sum(t(A) * log(mu)) + sum(t(1 - A) * log(1 - mu))
+  expect_equal(logprior_a(A, mu, alpha = 2.6), elementwise, tolerance = 1e-12)
+})
