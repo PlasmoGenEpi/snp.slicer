@@ -491,3 +491,37 @@ test_that("stored samples and the MAP state are snapshots under the compiled ker
   expect_equal(chain$map_allocation_matrix, map_matrices$allocation_matrix)
   expect_equal(chain$map_dictionary_matrix, map_matrices$dictionary_matrix)
 })
+
+#' Matrix-list counts where one specimen has no reads at one target.
+make_count_fixture_with_zero_coverage <- function() {
+  fixture <- make_mixing_count_fixture()
+  fixture$read1[3, 2] <- 0
+  fixture$read0[3, 2] <- 0
+  fixture
+}
+
+test_that("compiled kernel matches R on count models with zero-coverage cells", {
+  skip_if_not(cpp_kernel_available())
+
+  for (model_name in c("poisson", "binomial", "negative_binomial")) {
+    processed <- preprocess_data(make_count_fixture_with_zero_coverage(), model_name)
+    model_obj <- create_model(model_name, processed)
+    expect_true(any(model_obj$r == 0))
+
+    model_obj <- ensure_kernel_obs_cache(model_obj)
+    expect_true(all(is.finite(model_obj$kernel_loglik_const)), info = model_name)
+
+    states <- expect_kernel_matches_r(model_obj, n_iter = 3L)
+    expect_true(is.finite(states$cpp$logpost), info = model_name)
+  }
+})
+
+test_that("snp_slice runs with the compiled kernel on zero-coverage cells", {
+  skip_if_not(cpp_kernel_available())
+
+  old_opt <- options(snp.slicer.mcmc_kernel = "cpp")
+  on.exit(options(old_opt), add = TRUE)
+  result <- snp_slice(make_count_fixture_with_zero_coverage(), model = "negative_binomial",
+                      n_sample = 10, n_burnin = 5, seed = 2, verbose = FALSE)
+  expect_true(is.finite(result$chains[[1]]$diagnostics$final_logpost))
+})

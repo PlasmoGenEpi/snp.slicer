@@ -62,8 +62,11 @@ inline double dbinom_log_native(double y, double n, double p) {
          + y * std::log(p) + (n - y) * std::log(q);
 }
 
+// size == 0 is a point mass at y == 0 (as stats::dnbinom); without this guard
+// lgamma(0) - lgamma(0) yields NaN for zero-coverage cells.
 inline double dnbinom_log_native(double y, double r, double prop) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
   const double p = 1.0 / (1.0 + prop);
   const double q = 1.0 - p;
   return std::lgamma(y + r) - std::lgamma(r) - std::lgamma(y + 1.0)
@@ -82,6 +85,7 @@ inline double dbinom_log_const(double y, double n) {
 
 inline double dnbinom_log_const(double y, double r) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
   return std::lgamma(y + r) - std::lgamma(r) - std::lgamma(y + 1.0);
 }
 
@@ -105,6 +109,7 @@ SNP_SLICER_HOT double dbinom_log_fast(double prop, double n, double y, double lo
 
 SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double loglik_const) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return loglik_const;
   const double p = 1.0 / (1.0 + prop);
   const double q = 1.0 - p;
   return loglik_const + r * std::log(p) + y * std::log(q);
