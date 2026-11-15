@@ -395,6 +395,18 @@ test_that("compiled A/D kernel matches R reference on mixed infections for every
   }
 })
 
+test_that("compiled A/D kernel matches R reference on categorical mixed infections", {
+  skip_if_not(cpp_kernel_available())
+
+  fixture <- make_mixing_count_fixture()
+  y_cat <- counts_to_categorical(fixture$read0, fixture$read1)
+  expect_true(any(y_cat == 0.5, na.rm = TRUE))
+  model_obj <- create_model("categorical", preprocess_data(y_cat, "categorical"))
+
+  states <- expect_kernel_matches_r(model_obj, n_iter = 5L)
+  expect_gt(max(rowSums(states$cpp$A)), 1)
+})
+
 test_that("compiled kernel entry points leave their inputs unmodified", {
   skip_if_not(cpp_kernel_available())
 

@@ -221,6 +221,9 @@ void update_a(SliceState& state, ModelData& model) {
   }
   const double* log_int = log_int_tab.data();
   std::vector<double> y_log_r_row(static_cast<std::size_t>(P), 0.0);
+  // Categorical model: the lookup-table column for each target's observation,
+  // or nullptr where the observation is missing.
+  std::vector<const double*> llik_col_row(static_cast<std::size_t>(P), nullptr);
 
   for (int m = 0; m < mixed.size(); ++m) {
     const int host = mixed[m] - 1;
@@ -229,9 +232,9 @@ void update_a(SliceState& state, ModelData& model) {
     double* full_ptr = full_row.data();
     double row_sum = A_e.row(host).sum();
 
-    // Count models keep the log-likelihood of the specimen's current row, so
-    // each proposal evaluates only the flipped state. It is always assigned
-    // from a full sum, never incremented, so it cannot drift.
+    // The log-likelihood of the specimen's current row is kept, so each
+    // proposal evaluates only the flipped state. It is always assigned from a
+    // full sum, never incremented, so it cannot drift.
     double cur_ll = 0.0;
     double alt_ll = 0.0;
     bool cur_ll_stale = true;
@@ -249,6 +252,12 @@ void update_a(SliceState& state, ModelData& model) {
           y_log_r_row[sp] =
             code_row[sp] == OBS_Y_POS ? y_row[sp] * std::log(r_row[sp]) : 0.0;
         }
+      }
+    } else if (model_type == CATEGORICAL) {
+      for (int p = 0; p < P; ++p) {
+        const int yb = y_bin(obs.y_at(host, p));
+        llik_col_row[static_cast<std::size_t>(p)] =
+          yb < 0 ? nullptr : obs.llik_tab + yb * obs.llik_tab_nrow;
       }
     } else {
       for (int p = 0; p < P; ++p) {
@@ -282,21 +291,34 @@ void update_a(SliceState& state, ModelData& model) {
       double logp0 = log_1m_mu[static_cast<std::size_t>(k_idx)];
       double logp1 = log_mu[static_cast<std::size_t>(k_idx)];
 
-      if (model.model_type == CATEGORICAL) {
-        for (int p = 0; p < P; ++p) {
-          if (obs.has_obs_code() && obs.obs_code_at(host, p) == OBS_SKIP) {
-            continue;
+      if (model_type == CATEGORICAL) {
+        if (cur_ll_stale) {
+          const int n_cur = static_cast<int>(row_sum);
+          double acc = 0.0;
+          for (int p = 0; p < P; ++p) {
+            const double* col = llik_col_row[static_cast<std::size_t>(p)];
+            if (col == nullptr) continue;
+            acc += col[prop_bin_int(static_cast<int>(full_ptr[p]), n_cur)];
           }
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 / a0;
-          const double prop1 = (ad0 + d_kp) / (a0 + 1.0);
-          const double yp = obs.has_obs_code()
-            ? obs.y_at(host, p)
-            : y_row[static_cast<std::size_t>(p)];
-          logp0 += loglik_categorical_value(yp, prop0, obs.llik_tab, obs.llik_tab_nrow);
-          logp1 += loglik_categorical_value(yp, prop1, obs.llik_tab, obs.llik_tab_nrow);
+          cur_ll = acc;
+          cur_ll_stale = false;
         }
+
+        const bool has_k = old_a == 1.0;
+        const int n_alt = static_cast<int>(a0) + (has_k ? 0 : 1);
+        const int sign = has_k ? -1 : 1;
+        const double* d_row = D_ptr + k_idx;
+        double alt = 0.0;
+        for (int p = 0; p < P; ++p) {
+          const std::size_t sp = static_cast<std::size_t>(p);
+          const double* col = llik_col_row[sp];
+          if (col == nullptr) continue;
+          const int d_kp = static_cast<int>(d_row[sp * static_cast<std::size_t>(K)]);
+          alt += col[prop_bin_int(static_cast<int>(full_ptr[p]) + sign * d_kp, n_alt)];
+        }
+        alt_ll = alt;
+        logp0 += has_k ? alt : cur_ll;
+        logp1 += has_k ? cur_ll : alt;
       } else if (use_obs_layout) {
         if (cur_ll_stale) {
           const int n_cur = static_cast<int>(row_sum);

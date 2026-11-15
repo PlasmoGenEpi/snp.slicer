@@ -37,6 +37,13 @@ inline int prop_bin(double prop) {
   return 2;
 }
 
+// prop_bin(j / n) for integers 0 <= j <= n, without the division. The two agree
+// exactly: j / n and 0.99 can only round to the same double when j / n == 99 / 100.
+inline int prop_bin_int(int j, int n) {
+  if (j <= 0) return 0;
+  return (100 * j <= 99 * n) ? 1 : 2;
+}
+
 inline int y_bin(double y) {
   if (ISNA(y)) return -1;
   if (y == 0.0) return 0;
