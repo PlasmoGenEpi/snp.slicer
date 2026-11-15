@@ -337,3 +337,32 @@ test_that("read count models handle different parameter settings", {
     expect_true(get_chain(result)$diagnostics$final_kstar > 0)
   }
 })
+
+test_that("count models initialize and run when every specimen is a single infection", {
+  # Three distinct strains, each specimen carrying exactly one of them
+  strains <- rbind(
+    c(1, 0, 0, 1, 0, 1),
+    c(0, 1, 0, 1, 1, 0),
+    c(0, 0, 1, 0, 1, 1)
+  )
+  alt <- strains[rep(1:3, each = 4), ]
+  data <- list(read1 = alt * 100, read0 = (1 - alt) * 100)
+
+  for (backend in c("cpp", "r")) {
+    if (backend == "cpp" && !cpp_kernel_available()) next
+    old_opt <- options(snp.slicer.mcmc_kernel = backend)
+
+    for (model_name in c("poisson", "binomial", "negative_binomial")) {
+      info <- paste(backend, model_name)
+      # rho is given because the default (minor-allele read fraction) is 0 here
+      result <- snp_slice(data, model = model_name, n_sample = 10, n_burnin = 5,
+                          rho = 0.3, seed = 1, verbose = FALSE)
+      chain <- get_chain(result)
+      expect_true(is.finite(chain$diagnostics$final_logpost), info = info)
+      # Single infections are fixed at initialization, so every specimen keeps COI 1
+      expect_equal(unname(rowSums(chain$final_allocation_matrix)), rep(1, nrow(alt)), info = info)
+    }
+
+    options(old_opt)
+  }
+})
