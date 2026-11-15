@@ -207,8 +207,10 @@ void update_a(SliceState& state, ModelData& model) {
   }
 
   const int model_type = model.model_type;
+  // Poisson, binomial and negative binomial with the obs cache attached take
+  // their log terms from the integer table.
   const bool use_obs_layout =
-    model_type != CATEGORICAL &&
+    snp_slicer::is_binary_count_model(model_type) &&
     obs.has_loglik_const() &&
     obs.has_obs_code();
 

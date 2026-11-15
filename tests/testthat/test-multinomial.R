@@ -364,3 +364,28 @@ test_that("multinomial dictionary codes are labelled with the per-target allele 
   expect_equal(sum(af$count), 3)
   expect_equal(nrow(af), 6)
 })
+
+test_that("the generic compiled update_a uses the multinomial term on the expanded layout", {
+  skip_if_not(snp.slicer:::cpp_kernel_available(), "compiled kernel not available")
+  # One specimen, one target with allele slots (A, T) and reads 1700 / 1000.
+  # It carries strain 1 (A) and strain 2 (T); strain 3 is a second A carrier.
+  # Adding strain 3 moves the proportions from (1/2, 1/2) to (2/3, 1/3):
+  #   multinomial term: 1700 * log(4/3) + 1000 * log(2/3) = +83.6, so it is added;
+  #   a Poisson term on the same cells would give -33 and leave it out.
+  type <- snp.slicer:::model_type_id("multinomial")
+  counts <- matrix(c(1700, 1000), nrow = 1)
+  D_expanded <- rbind(c(1, 0), c(0, 1), c(1, 0))
+  cache <- snp.slicer:::cpp_build_kernel_obs_cache(counts, counts, type)
+
+  for (seed in 1:5) {
+    set.seed(seed)
+    result <- snp.slicer:::cpp_update_a(
+      A = matrix(c(1, 1, 0), nrow = 1), D = D_expanded, mu = c(0.9, 0.8, 0.5),
+      mixed = 1L, kplus = 3L, kstar = 2L, y = counts, r = counts,
+      model_type = type, llik_tab = snp.slicer:::NULL_LLIK_TAB,
+      loglik_const = cache$loglik_const, obs_code = cache$obs_code
+    )
+    expect_equal(as.vector(result$A), c(1, 1, 1))
+    expect_equal(result$kstar, 3L)
+  }
+})

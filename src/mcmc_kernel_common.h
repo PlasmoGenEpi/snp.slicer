@@ -122,6 +122,15 @@ SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double l
   return loglik_const + r * std::log(p) + y * std::log(q);
 }
 
+// The models whose cell likelihood is a function of an integer ratio j / n and
+// can therefore be evaluated from a table of log(integer). MULTINOMIAL is not
+// one of them here: it has its own locus-aware kernel and otherwise goes
+// through the generic per-cell helpers below.
+inline bool is_binary_count_model(int model_type) {
+  return model_type == POISSON || model_type == BINOMIAL ||
+         model_type == NEGATIVE_BINOMIAL;
+}
+
 // One allele-slot cell of the multinomial kernel term. Reads for an allele no
 // assigned strain carries (prop == 0) make the state impossible.
 inline double dmultinom_cell_log(double prop, double y) {
