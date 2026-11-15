@@ -122,13 +122,14 @@ create_model <- function(
 #' @param store_mcmc Whether to store full MCMC samples
 #' @param chain_id Integer identifier of this chain (1 when running one chain)
 #' @param seed Integer seed for this chain
+#' @param threshold Threshold for identifying single infections at initialization
 #'
 #' @details Sampling iterations are returned when \code{store_mcmc = TRUE}.
 #'
 #' @return MCMC results
 #' @keywords internal
 run_chain <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc,
-                      chain_id = 1L, seed = NULL) {
+                      chain_id = 1L, seed = NULL, threshold = 0.001) {
 
   if (!is.null(seed)) {
     set.seed(seed)
@@ -143,7 +144,7 @@ run_chain <- function(model_obj, n_sample, n_burnin, gap, verbose, store_mcmc,
     cat_w_prefix("Initializing state...\n")
   }
 
-  state <- model_obj$initialize_state(model_obj, threshold = 0.001)
+  state <- model_obj$initialize_state(model_obj, threshold = threshold)
   
   if (verbose) {
     cat_w_prefix("Initialization complete, log-likelihood: ", state$loglik, "\n")

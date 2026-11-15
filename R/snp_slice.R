@@ -157,6 +157,7 @@ snp_slice <- function(data,
     gap = gap,
     verbose = verbose,
     store_mcmc = store_mcmc,
+    threshold = threshold,
     n_chains = as.integer(n_chains),
     n_cores = as.integer(n_cores)
   )
