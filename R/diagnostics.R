@@ -471,7 +471,7 @@ print.snp_slice_results <- function(x, chain = NULL, ...) {
   cat("SNP-Slice Results\n")
   cat("================\n")
   cat("Model:", x$model_info$model, "\n")
-  cat("Dimensions:", nrow(x$map_allocation_matrix), "hosts x", ncol(x$map_dictionary_matrix), "strains x", ncol(x$map_dictionary_matrix), "SNPs\n")
+  cat("Dimensions:", nrow(x$map_allocation_matrix), "hosts x", nrow(x$map_dictionary_matrix), "strains x", ncol(x$map_dictionary_matrix), "SNPs\n")
   cat("Strains identified:", nrow(x$map_dictionary_matrix), "\n")
 
   if (n_chains > 1) {

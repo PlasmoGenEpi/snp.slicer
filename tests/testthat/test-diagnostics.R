@@ -201,7 +201,7 @@ test_that("print.snp_slice_results works", {
   expect_true(any(grepl("SNP-Slice Results", output)))
   expect_true(any(grepl("negative_binomial", output)))
   expect_true(any(grepl("2 hosts", output)))
-#   expect_true(any(grepl("2 strains", output)))
+  expect_true(any(grepl("2 strains x 3 SNPs", output)))
 })
 
 test_that("plot_convergence validates input", {
