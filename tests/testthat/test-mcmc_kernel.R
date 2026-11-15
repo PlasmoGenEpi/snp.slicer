@@ -560,3 +560,27 @@ test_that("logprior_a equals the elementwise Bernoulli log prior", {
   elementwise <- sum(t(A) * log(mu)) + sum(t(1 - A) * log(1 - mu))
   expect_equal(logprior_a(A, mu, alpha = 2.6), elementwise, tolerance = 1e-12)
 })
+
+test_that("R reference update_d leaves fixed strains alone when kmin exceeds kstar", {
+  # Every specimen is a single infection, so kmin = kstar + 1 and there is no
+  # strain for update_d to resample.
+  strains <- rbind(c(1, 0, 0, 1), c(0, 1, 1, 0))
+  alt <- strains[rep(1:2, each = 3), ]
+  processed <- preprocess_data(list(read1 = alt * 100, read0 = (1 - alt) * 100),
+                               "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed, rho = 0.3)
+
+  set.seed(3L)
+  state <- model_obj$initialize_state(model_obj, threshold = 0.001)
+  state <- slice_init(state, model_obj)
+  expect_gt(state$kmin, state$kstar)
+
+  # A dictionary entry the data contradicts: resampling strain kstar would
+  # flip it back, so an unchanged D shows the strain was not touched.
+  hosts <- which(state$A[, state$kstar] > 0)
+  target <- which(processed$y[hosts[1], ] > 0)[1]
+  state$D[state$kstar, target] <- 0
+
+  updated <- slice_update_d_r(state, model_obj)
+  expect_identical(updated$D, state$D)
+})

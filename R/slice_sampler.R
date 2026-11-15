@@ -245,7 +245,13 @@ slice_update_d <- function(state, model_obj) {
 slice_update_d_r <- function(state, model_obj) {
   an <- rowSums(state$A)
 
-  for (k in state$kmin:state$kstar) {
+  # seq() rather than kmin:kstar: when every strain belongs to a single
+  # infection kmin exceeds kstar and the colon would count downward, resampling
+  # a fixed strain. The compiled kernel skips this case too.
+  if (state$kstar < state$kmin) {
+    return(state)
+  }
+  for (k in seq(state$kmin, state$kstar)) {
     # Leave-k-out product: one matrix multiply per k instead of P per k
     M_k <- state$A[, -k, drop = FALSE] %*% state$D[-k, , drop = FALSE]
     for (p in 1:model_obj$P) {
