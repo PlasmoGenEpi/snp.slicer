@@ -234,9 +234,13 @@ inline double gridsample_bounds(double lb, double ub,
 }
 
 inline double logf_newfeature(double x, int N, double alpha) {
+  // sum_{i=1}^{N} (1 - x)^i / i, with the power carried as a running product
+  const double q = 1.0 - x;
   double logf = 0.0;
+  double power = 1.0;
   for (int i = 1; i <= N; ++i) {
-    logf += std::pow(1.0 - x, i) / static_cast<double>(i);
+    power *= q;
+    logf += power / static_cast<double>(i);
   }
   return alpha * logf + (alpha - 1.0) * std::log(x) + N * std::log(1.0 - x);
 }
