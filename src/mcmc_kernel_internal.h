@@ -93,7 +93,7 @@ inline void fill_loglik_const_buffer(ModelData& model) {
                               static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
       switch (model.model_type) {
       case POISSON:
-        out[idx] = dpois_log_const(y);
+        out[idx] = dpois_log_const(y, r);
         break;
       case BINOMIAL:
         out[idx] = dbinom_log_const(y, r);

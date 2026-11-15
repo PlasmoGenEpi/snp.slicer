@@ -21,12 +21,22 @@ namespace snp_slicer {
 namespace kernel {
 namespace {
 
+// log_int[m] = log(m) for m = 0..max_value, with log_int[0] = -Inf.
+std::vector<double> make_log_int_table(int max_value) {
+  std::vector<double> log_int(static_cast<std::size_t>(max_value) + 1);
+  log_int[0] = R_NegInf;
+  for (std::size_t m = 1; m < log_int.size(); ++m) {
+    log_int[m] = std::log(static_cast<double>(m));
+  }
+  return log_int;
+}
+
 // Log-likelihood of one count-model cell when the strain proportion is j / n
-// for integers 0 <= j <= n, as it always is in update_a. log_int[m] = log(m)
-// with log_int[0] = -Inf, so the hot loop takes no logarithms. `c` is the cached
-// loglik_const term and `y_log_r` is y * log(r), used by the Poisson model only.
+// for integers 0 <= j <= n, as it is whenever A and D are binary. With the
+// table from make_log_int_table() the hot loops take no logarithms. `c` is the
+// cell's cached loglik_const term.
 inline double count_loglik_int(int j, int n, double inv_n, double y, double r,
-                               double c, double y_log_r, int code, int model_type,
+                               double c, int code, int model_type,
                                const double* log_int) {
   if (model_type == NEGATIVE_BINOMIAL) {
     // prob = n / (n + j)
@@ -42,11 +52,11 @@ inline double count_loglik_int(int j, int n, double inv_n, double y, double r,
     if (code == OBS_Y_ZERO) return c + r * (log_int[n - j] - log_n);
     return c + y * (log_int[j] - log_n) + (r - y) * (log_int[n - j] - log_n);
   }
-  // POISSON: lambda = r * j / n
+  // POISSON: lambda = r * j / n; y * log(r) is already in c
   const double lambda = r * (static_cast<double>(j) * inv_n);
   if (lambda <= 0.0) return (code == OBS_Y_ZERO) ? 0.0 : R_NegInf;
   if (code == OBS_Y_ZERO) return c - lambda;
-  return c + y_log_r + y * (log_int[j] - log_int[n]) - lambda;
+  return c + y * (log_int[j] - log_int[n]) - lambda;
 }
 
 double loglik_target_col_active(const std::vector<int>& active_hosts,
@@ -216,13 +226,8 @@ void update_a(SliceState& state, ModelData& model) {
 
   // A specimen carries at most K strains, so every proportion is j / n with
   // n <= K and the negative binomial needs log(n + j) <= log(2K).
-  std::vector<double> log_int_tab(static_cast<std::size_t>(2 * K + 2));
-  log_int_tab[0] = R_NegInf;
-  for (std::size_t q = 1; q < log_int_tab.size(); ++q) {
-    log_int_tab[q] = std::log(static_cast<double>(q));
-  }
+  const std::vector<double> log_int_tab = make_log_int_table(2 * K + 1);
   const double* log_int = log_int_tab.data();
-  std::vector<double> y_log_r_row(static_cast<std::size_t>(P), 0.0);
   // Categorical model: the lookup-table column for each target's observation,
   // or nullptr where the observation is missing.
   std::vector<const double*> llik_col_row(static_cast<std::size_t>(P), nullptr);
@@ -247,13 +252,6 @@ void update_a(SliceState& state, ModelData& model) {
         r_row[static_cast<std::size_t>(p)] = obs.r_at(host, p);
         c_row[static_cast<std::size_t>(p)] = obs.loglik_const_at(host, p);
         code_row[static_cast<std::size_t>(p)] = obs.obs_code_at(host, p);
-      }
-      if (model_type == POISSON) {
-        for (int p = 0; p < P; ++p) {
-          const std::size_t sp = static_cast<std::size_t>(p);
-          y_log_r_row[sp] =
-            code_row[sp] == OBS_Y_POS ? y_row[sp] * std::log(r_row[sp]) : 0.0;
-        }
       }
     } else if (model_type == CATEGORICAL) {
       for (int p = 0; p < P; ++p) {
@@ -332,7 +330,7 @@ void update_a(SliceState& state, ModelData& model) {
             if (code == OBS_SKIP) continue;
             acc += count_loglik_int(
               static_cast<int>(full_ptr[p]), n_cur, inv_cur, y_row[sp], r_row[sp],
-              c_row[sp], y_log_r_row[sp], code, model_type, log_int);
+              c_row[sp], code, model_type, log_int);
           }
           cur_ll = acc;
           cur_ll_stale = false;
@@ -352,7 +350,7 @@ void update_a(SliceState& state, ModelData& model) {
           const int d_kp = static_cast<int>(d_row[sp * static_cast<std::size_t>(K)]);
           alt += count_loglik_int(
             static_cast<int>(full_ptr[p]) + sign * d_kp, n_alt, inv_alt, y_row[sp],
-            r_row[sp], c_row[sp], y_log_r_row[sp], code, model_type, log_int);
+            r_row[sp], c_row[sp], code, model_type, log_int);
         }
         alt_ll = alt;
         logp0 += has_k ? alt : cur_ll;
@@ -615,6 +613,24 @@ void update_d(SliceState& state, ModelData& model) {
   const double log_rho = std::log(model.rho);
   const double log_1m_rho = std::log(1.0 - model.rho);
 
+  // Count models: proportions are (ad - d + {0, 1}) / an for integers, so both
+  // states of a dictionary entry come from the log table in one pass.
+  const int model_type = model.model_type;
+  const bool use_table =
+    snp_slicer::is_binary_count_model(model_type) &&
+    obs.has_loglik_const() && obs.has_obs_code();
+  std::vector<double> log_int_tab;
+  std::vector<double> inv_an;
+  if (use_table) {
+    log_int_tab = make_log_int_table(2 * K + 1);
+    inv_an.resize(static_cast<std::size_t>(N));
+    for (int i = 0; i < N; ++i) {
+      inv_an[static_cast<std::size_t>(i)] =
+        1.0 / static_cast<double>(an[static_cast<std::size_t>(i)]);
+    }
+  }
+  const double* log_int = log_int_tab.data();
+
   const int k_active_last = std::min(kstar, K);
   for (int k = kmin; k <= k_active_last; ++k) {
     const int k_idx = k - 1;
@@ -633,10 +649,31 @@ void update_d(SliceState& state, ModelData& model) {
       const double* ad_col = AD.col(p).data();
       const double d_kp = D_e(k_idx, p);
 
-      const double logp0 = log_1m_rho + loglik_target_col_active(
-        hosts, ad_col, A_col, d_kp, an.data(), obs, p, model.model_type, false);
-      const double logp1 = log_rho + loglik_target_col_active(
-        hosts, ad_col, A_col, d_kp, an.data(), obs, p, model.model_type, true);
+      double logp0 = log_1m_rho;
+      double logp1 = log_rho;
+      if (use_table) {
+        const std::size_t offset = static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
+        const int d_int = static_cast<int>(d_kp);
+        for (int i : hosts) {
+          const std::size_t cell = offset + static_cast<std::size_t>(i);
+          const int code = obs.obs_code[cell];
+          if (code == OBS_SKIP) continue;
+          const int n = an[static_cast<std::size_t>(i)];
+          const double inv_n = inv_an[static_cast<std::size_t>(i)];
+          // Carriers of the allele among the specimen's other strains
+          const int j0 = static_cast<int>(ad_col[i]) - d_int;
+          const double y = obs.y_col[cell];
+          const double r = obs.r_col[cell];
+          const double c = obs.loglik_const[cell];
+          logp0 += count_loglik_int(j0, n, inv_n, y, r, c, code, model_type, log_int);
+          logp1 += count_loglik_int(j0 + 1, n, inv_n, y, r, c, code, model_type, log_int);
+        }
+      } else {
+        logp0 += loglik_target_col_active(
+          hosts, ad_col, A_col, d_kp, an.data(), obs, p, model_type, false);
+        logp1 += loglik_target_col_active(
+          hosts, ad_col, A_col, d_kp, an.data(), obs, p, model_type, true);
+      }
 
       const double old_d = d_kp;
       const double new_d = unif_rand() < mh_ratio(logp1, logp0) ? 1.0 : 0.0;
@@ -687,6 +724,29 @@ double total_loglik_matrix(const Eigen::MatrixXd& A_e,
   const Eigen::MatrixXd ad = A_e * D_e;
   const Eigen::VectorXd an = A_e.rowwise().sum();
   double ll = 0.0;
+
+  if (snp_slicer::is_binary_count_model(model_type) &&
+      obs.has_loglik_const() && obs.has_obs_code()) {
+    // Every proportion is ad / an for integers, so use the log table.
+    const std::vector<double> log_int_tab =
+      make_log_int_table(2 * static_cast<int>(A_e.cols()) + 1);
+    const double* log_int = log_int_tab.data();
+    for (int p = 0; p < P; ++p) {
+      const std::size_t offset = static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
+      for (int i = 0; i < N; ++i) {
+        const std::size_t cell = offset + static_cast<std::size_t>(i);
+        const int code = obs.obs_code[cell];
+        if (code == OBS_SKIP) continue;
+        const int n = static_cast<int>(an(i));
+        if (n <= 0) return R_NaN;  // a specimen with no strains has no proportion
+        ll += count_loglik_int(
+          static_cast<int>(ad(i, p)), n, 1.0 / static_cast<double>(n), obs.y_col[cell],
+          obs.r_col[cell], obs.loglik_const[cell], code, model_type, log_int);
+      }
+    }
+    return ll;
+  }
+
   for (int p = 0; p < P; ++p) {
     for (int i = 0; i < N; ++i) {
       const double an_i = an(i);

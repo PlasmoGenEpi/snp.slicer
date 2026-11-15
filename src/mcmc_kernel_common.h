@@ -80,9 +80,12 @@ inline double dnbinom_log_native(double y, double r, double prop) {
          + r * std::log(p) + y * std::log(q);
 }
 
-inline double dpois_log_const(double y) {
+// log dpois(y; r * prop) = [y * log(r) - lgamma(y + 1)] + y * log(prop) - r * prop;
+// the bracketed part does not depend on prop.
+inline double dpois_log_const(double y, double r) {
   if (ISNA(y)) return 0.0;
-  return -std::lgamma(y + 1.0);
+  if (y == 0.0) return 0.0;
+  return y * std::log(r) - std::lgamma(y + 1.0);
 }
 
 inline double dbinom_log_const(double y, double n) {
@@ -100,7 +103,7 @@ SNP_SLICER_HOT double dpois_log_fast(double prop, double r, double y, double log
   if (ISNA(y)) return 0.0;
   const double lambda = r * prop;
   if (lambda <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
-  return loglik_const + y * std::log(lambda) - lambda;
+  return loglik_const + y * std::log(prop) - lambda;
 }
 
 SNP_SLICER_HOT double dbinom_log_fast(double prop, double n, double y, double loglik_const) {
