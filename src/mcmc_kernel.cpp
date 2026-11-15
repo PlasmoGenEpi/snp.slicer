@@ -471,7 +471,19 @@ void update_a_multinomial(SliceState& state,
   }
 
   std::vector<double> full_row(static_cast<std::size_t>(L));
-  std::vector<int> slot_of_k(static_cast<std::size_t>(P));
+
+  // slot_tab[k * P + p]: the allele slot strain k carries at target p. Stored
+  // by strain so the inner loops read it contiguously; D is fixed in this update.
+  std::vector<int> slot_tab(static_cast<std::size_t>(K) * static_cast<std::size_t>(P));
+  for (int p = 0; p < P; ++p) {
+    const int offset = col_offset[p];
+    for (int kk = 0; kk < K; ++kk) {
+      slot_tab[static_cast<std::size_t>(kk) * static_cast<std::size_t>(P) +
+               static_cast<std::size_t>(p)] = offset + d_at(kk, p);
+    }
+  }
+  // The specimen's read counts by slot, with missing counts stored as 0.
+  std::vector<double> y_host(static_cast<std::size_t>(L));
 
   for (int m = 0; m < mixed.size(); ++m) {
     const int host = mixed[m] - 1;
@@ -483,9 +495,14 @@ void update_a_multinomial(SliceState& state,
       const double a = A(host, kk);
       if (a <= 0.0) continue;
       row_sum += a;
+      const int* slots = slot_tab.data() + static_cast<std::size_t>(kk) * static_cast<std::size_t>(P);
       for (int p = 0; p < P; ++p) {
-        full_row[static_cast<std::size_t>(col_offset[p] + d_at(kk, p))] += a;
+        full_row[static_cast<std::size_t>(slots[p])] += a;
       }
+    }
+    for (int l = 0; l < L; ++l) {
+      const double y = counts_col[host + l * N];
+      y_host[static_cast<std::size_t>(l)] = ISNA(y) ? 0.0 : y;
     }
     // Total reads across observed targets: the a0 -> a0 + 1 normalisation
     // shift enters every read once.
@@ -500,16 +517,15 @@ void update_a_multinomial(SliceState& state,
       const double old_a = A(host, k_idx);
       const double a0 = row_sum - old_a;
 
-      for (int p = 0; p < P; ++p) {
-        slot_of_k[static_cast<std::size_t>(p)] = col_offset[p] + d_at(k_idx, p);
-      }
+      const int* slot_of_k =
+        slot_tab.data() + static_cast<std::size_t>(k_idx) * static_cast<std::size_t>(P);
 
       if (a0 == 0.0) {
         A(host, k_idx) = 1.0;
         if (A(host, k_idx) != old_a) {
           const double delta = A(host, k_idx) - old_a;
           for (int p = 0; p < P; ++p) {
-            full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+            full_row[static_cast<std::size_t>(slot_of_k[p])] += delta;
           }
           row_sum += delta;
           col_tracker.apply_delta(k_idx, delta);
@@ -528,9 +544,9 @@ void update_a_multinomial(SliceState& state,
       double lik_ratio = 0.0;
       bool without_k_impossible = false;
       for (int p = 0; p < P; ++p) {
-        const int slot = slot_of_k[static_cast<std::size_t>(p)];
-        const double y = counts_col[host + slot * N];
-        if (ISNA(y) || y == 0.0) continue;
+        const int slot = slot_of_k[p];
+        const double y = y_host[static_cast<std::size_t>(slot)];
+        if (y == 0.0) continue;
         const double c = full_row[static_cast<std::size_t>(slot)] - old_a;
         if (c <= 0.0) {
           without_k_impossible = true;
@@ -566,7 +582,7 @@ void update_a_multinomial(SliceState& state,
       if (A(host, k_idx) != old_a) {
         const double delta = A(host, k_idx) - old_a;
         for (int p = 0; p < P; ++p) {
-          full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+          full_row[static_cast<std::size_t>(slot_of_k[p])] += delta;
         }
         row_sum += delta;
         col_tracker.apply_delta(k_idx, delta);
