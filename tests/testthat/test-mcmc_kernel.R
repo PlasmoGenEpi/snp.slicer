@@ -382,6 +382,19 @@ make_mixing_count_fixture <- function() {
   list(read1 = read1, read0 = 100 - read1)
 }
 
+test_that("compiled A/D kernel matches R reference on mixed infections for every count model", {
+  skip_if_not(cpp_kernel_available())
+
+  # Specimens here carry several strains, so update_a sees a range of j / n
+  # proportions rather than the 0 and 1 of the two-specimen fixtures.
+  for (model_name in c("poisson", "binomial", "negative_binomial")) {
+    processed <- preprocess_data(make_mixing_count_fixture(), model_name)
+    model_obj <- create_model(model_name, processed)
+    states <- expect_kernel_matches_r(model_obj, n_iter = 5L)
+    expect_gt(max(rowSums(states$cpp$A)), 1)
+  }
+})
+
 test_that("compiled kernel entry points leave their inputs unmodified", {
   skip_if_not(cpp_kernel_available())
 

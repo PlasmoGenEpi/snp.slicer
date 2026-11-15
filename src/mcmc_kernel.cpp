@@ -21,6 +21,34 @@ namespace snp_slicer {
 namespace kernel {
 namespace {
 
+// Log-likelihood of one count-model cell when the strain proportion is j / n
+// for integers 0 <= j <= n, as it always is in update_a. log_int[m] = log(m)
+// with log_int[0] = -Inf, so the hot loop takes no logarithms. `c` is the cached
+// loglik_const term and `y_log_r` is y * log(r), used by the Poisson model only.
+inline double count_loglik_int(int j, int n, double inv_n, double y, double r,
+                               double c, double y_log_r, int code, int model_type,
+                               const double* log_int) {
+  if (model_type == NEGATIVE_BINOMIAL) {
+    // prob = n / (n + j)
+    const double log_den = log_int[n + j];
+    double value = c + r * (log_int[n] - log_den);
+    if (code != OBS_Y_ZERO) value += y * (log_int[j] - log_den);
+    return value;
+  }
+  if (model_type == BINOMIAL) {
+    if (j <= 0) return (code == OBS_Y_ZERO) ? 0.0 : R_NegInf;
+    if (j >= n) return (y == r) ? 0.0 : R_NegInf;
+    const double log_n = log_int[n];
+    if (code == OBS_Y_ZERO) return c + r * (log_int[n - j] - log_n);
+    return c + y * (log_int[j] - log_n) + (r - y) * (log_int[n - j] - log_n);
+  }
+  // POISSON: lambda = r * j / n
+  const double lambda = r * (static_cast<double>(j) * inv_n);
+  if (lambda <= 0.0) return (code == OBS_Y_ZERO) ? 0.0 : R_NegInf;
+  if (code == OBS_Y_ZERO) return c - lambda;
+  return c + y_log_r + y * (log_int[j] - log_int[n]) - lambda;
+}
+
 double loglik_target_col_active(const std::vector<int>& active_hosts,
                                 const double* ad_col,
                                 const double* A_col,
@@ -178,6 +206,22 @@ void update_a(SliceState& state, ModelData& model) {
     log_1m_mu[static_cast<std::size_t>(k)] = std::log(1.0 - mu[k]);
   }
 
+  const int model_type = model.model_type;
+  const bool use_obs_layout =
+    model_type != CATEGORICAL &&
+    obs.has_loglik_const() &&
+    obs.has_obs_code();
+
+  // A specimen carries at most K strains, so every proportion is j / n with
+  // n <= K and the negative binomial needs log(n + j) <= log(2K).
+  std::vector<double> log_int_tab(static_cast<std::size_t>(2 * K + 2));
+  log_int_tab[0] = R_NegInf;
+  for (std::size_t q = 1; q < log_int_tab.size(); ++q) {
+    log_int_tab[q] = std::log(static_cast<double>(q));
+  }
+  const double* log_int = log_int_tab.data();
+  std::vector<double> y_log_r_row(static_cast<std::size_t>(P), 0.0);
+
   for (int m = 0; m < mixed.size(); ++m) {
     const int host = mixed[m] - 1;
 
@@ -185,10 +229,12 @@ void update_a(SliceState& state, ModelData& model) {
     double* full_ptr = full_row.data();
     double row_sum = A_e.row(host).sum();
 
-    const bool use_obs_layout =
-      model.model_type != CATEGORICAL &&
-      obs.has_loglik_const() &&
-      obs.has_obs_code();
+    // Count models keep the log-likelihood of the specimen's current row, so
+    // each proposal evaluates only the flipped state. It is always assigned
+    // from a full sum, never incremented, so it cannot drift.
+    double cur_ll = 0.0;
+    double alt_ll = 0.0;
+    bool cur_ll_stale = true;
 
     if (use_obs_layout) {
       for (int p = 0; p < P; ++p) {
@@ -196,6 +242,13 @@ void update_a(SliceState& state, ModelData& model) {
         r_row[static_cast<std::size_t>(p)] = obs.r_at(host, p);
         c_row[static_cast<std::size_t>(p)] = obs.loglik_const_at(host, p);
         code_row[static_cast<std::size_t>(p)] = obs.obs_code_at(host, p);
+      }
+      if (model_type == POISSON) {
+        for (int p = 0; p < P; ++p) {
+          const std::size_t sp = static_cast<std::size_t>(p);
+          y_log_r_row[sp] =
+            code_row[sp] == OBS_Y_POS ? y_row[sp] * std::log(r_row[sp]) : 0.0;
+        }
       }
     } else {
       for (int p = 0; p < P; ++p) {
@@ -215,6 +268,7 @@ void update_a(SliceState& state, ModelData& model) {
           const double delta = A(host, k_idx) - old_a;
           full_row += delta * D_e.row(k_idx);
           row_sum += delta;
+          cur_ll_stale = true;
           col_tracker.apply_delta(k_idx, delta);
           if (A(host, k_idx) == 1.0) {
             kstar = std::max(kstar, k);
@@ -243,53 +297,42 @@ void update_a(SliceState& state, ModelData& model) {
           logp0 += loglik_categorical_value(yp, prop0, obs.llik_tab, obs.llik_tab_nrow);
           logp1 += loglik_categorical_value(yp, prop1, obs.llik_tab, obs.llik_tab_nrow);
         }
-      } else if (use_obs_layout && model.model_type == NEGATIVE_BINOMIAL) {
-        const double inv_a0 = 1.0 / a0;
-        const double inv_a1 = 1.0 / (a0 + 1.0);
-        for (int p = 0; p < P; ++p) {
-          const int code = code_row[static_cast<std::size_t>(p)];
-          if (code == OBS_SKIP) continue;
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 * inv_a0;
-          const double prop1 = (ad0 + d_kp) * inv_a1;
-          const double c = c_row[static_cast<std::size_t>(p)];
-          const double rp = r_row[static_cast<std::size_t>(p)];
-          if (code == OBS_Y_ZERO) {
-            const double p0 = 1.0 / (1.0 + prop0);
-            const double p1 = 1.0 / (1.0 + prop1);
-            logp0 += c + rp * std::log(p0);
-            logp1 += c + rp * std::log(p1);
-          } else {
-            const double yp = y_row[static_cast<std::size_t>(p)];
-            const double p0 = 1.0 / (1.0 + prop0);
-            const double p1 = 1.0 / (1.0 + prop1);
-            logp0 += c + rp * std::log(p0) + yp * std::log(1.0 - p0);
-            logp1 += c + rp * std::log(p1) + yp * std::log(1.0 - p1);
-          }
-        }
       } else if (use_obs_layout) {
-        const double inv_a0 = 1.0 / a0;
-        const double inv_a1 = 1.0 / (a0 + 1.0);
-        const int model_type = model.model_type;
-        for (int p = 0; p < P; ++p) {
-          const int code = code_row[static_cast<std::size_t>(p)];
-          if (code == OBS_SKIP) continue;
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 * inv_a0;
-          const double prop1 = (ad0 + d_kp) * inv_a1;
-          const double c = c_row[static_cast<std::size_t>(p)];
-          const double rp = r_row[static_cast<std::size_t>(p)];
-          if (code == OBS_Y_ZERO) {
-            logp0 += count_loglik_y0_fast(prop0, rp, c, model_type);
-            logp1 += count_loglik_y0_fast(prop1, rp, c, model_type);
-          } else {
-            const double yp = y_row[static_cast<std::size_t>(p)];
-            logp0 += loglik_value_fast(prop0, yp, rp, c, model_type);
-            logp1 += loglik_value_fast(prop1, yp, rp, c, model_type);
+        if (cur_ll_stale) {
+          const int n_cur = static_cast<int>(row_sum);
+          const double inv_cur = 1.0 / static_cast<double>(n_cur);
+          double acc = 0.0;
+          for (int p = 0; p < P; ++p) {
+            const std::size_t sp = static_cast<std::size_t>(p);
+            const int code = code_row[sp];
+            if (code == OBS_SKIP) continue;
+            acc += count_loglik_int(
+              static_cast<int>(full_ptr[p]), n_cur, inv_cur, y_row[sp], r_row[sp],
+              c_row[sp], y_log_r_row[sp], code, model_type, log_int);
           }
+          cur_ll = acc;
+          cur_ll_stale = false;
         }
+
+        // The flipped state: one strain fewer if the specimen carries k, one more if not.
+        const bool has_k = old_a == 1.0;
+        const int n_alt = static_cast<int>(a0) + (has_k ? 0 : 1);
+        const double inv_alt = 1.0 / static_cast<double>(n_alt);
+        const int sign = has_k ? -1 : 1;
+        const double* d_row = D_ptr + k_idx;
+        double alt = 0.0;
+        for (int p = 0; p < P; ++p) {
+          const std::size_t sp = static_cast<std::size_t>(p);
+          const int code = code_row[sp];
+          if (code == OBS_SKIP) continue;
+          const int d_kp = static_cast<int>(d_row[sp * static_cast<std::size_t>(K)]);
+          alt += count_loglik_int(
+            static_cast<int>(full_ptr[p]) + sign * d_kp, n_alt, inv_alt, y_row[sp],
+            r_row[sp], c_row[sp], y_log_r_row[sp], code, model_type, log_int);
+        }
+        alt_ll = alt;
+        logp0 += has_k ? alt : cur_ll;
+        logp1 += has_k ? cur_ll : alt;
       } else {
         const double inv_a0 = 1.0 / a0;
         const double inv_a1 = 1.0 / (a0 + 1.0);
@@ -333,6 +376,7 @@ void update_a(SliceState& state, ModelData& model) {
         const double delta = A(host, k_idx) - old_a;
         full_row += delta * D_e.row(k_idx);
         row_sum += delta;
+        cur_ll = alt_ll;
         col_tracker.apply_delta(k_idx, delta);
         if (A(host, k_idx) == 1.0) {
           kstar = std::max(kstar, k);
