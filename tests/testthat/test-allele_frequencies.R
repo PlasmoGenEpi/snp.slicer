@@ -238,3 +238,92 @@ test_that("the stored example results carry y_slot = 2 (they were generated from
   expect_equal(res$model_info$processed_data$y_slot, 2L)
   expect_true(identical(unname(res$model_info$processed_data$y), unname(example_snp_data$read1)))
 })
+
+# Known-truth regression for issue #10: every input path must attach a
+# frequency to the allele that actually has it. Target 1 carries a rare allele
+# on one of six strains (true frequency 0.22); the fits below must report that
+# allele, by label, on the rare side. Each path is run in both orientations so
+# a lookup that only gets one slot order right still fails.
+simulate_rare_allele <- function() {
+  set.seed(3)
+  N <- 40
+  P <- 8
+  K <- 6
+  strains <- matrix(rbinom(K * P, 1, 0.5), K, P)
+  strains[, 1] <- c(1, 0, 0, 0, 0, 0)
+  # 30 single infections and 10 mixed ones
+  A <- matrix(0, N, K)
+  for (i in seq_len(N)) A[i, sample(K, if (i <= 30) 1 else 2)] <- 1
+  rare <- round((A %*% strains) / rowSums(A) * 200)
+  list(
+    rare = rare,
+    common = 200 - rare,
+    truth = sum(A %*% strains[, 1]) / sum(A)
+  )
+}
+
+rare_allele_long <- function(sim, rare_label, common_label) {
+  N <- nrow(sim$rare)
+  long <- do.call(rbind, lapply(seq_len(ncol(sim$rare)), function(p) {
+    data.frame(
+      specimen_id = rep(paste0("s", seq_len(N)), 2),
+      target_id = paste0("t", p),
+      target_value = rep(c(rare_label, common_label), each = N),
+      target_count = c(sim$rare[, p], sim$common[, p])
+    )
+  }))
+  long[long$target_count > 0, ]
+}
+
+fit_rare_allele <- function(data, model) {
+  snp_slice(data, model = model, n_sample = 200, n_burnin = 200, seed = 4, verbose = FALSE)
+}
+
+expect_rare_allele <- function(result, target, rare_label, common_label, truth) {
+  af <- calculate_allele_frequencies(result, target)
+  expect_setequal(af$allele, c(rare_label, common_label))
+  rare_freq <- af$frequency[af$allele == rare_label]
+  expect_lt(rare_freq, 0.5)
+  expect_lt(abs(rare_freq - truth), 0.1)
+}
+
+test_that("count model with list(read0, read1) input labels the rare allele correctly", {
+  sim <- simulate_rare_allele()
+  expect_equal(sim$truth, 0.22)
+
+  fit <- fit_rare_allele(list(read0 = sim$common, read1 = sim$rare), "negative_binomial")
+  expect_rare_allele(fit, 1, "alt", "ref", sim$truth)
+
+  fit <- fit_rare_allele(list(read0 = sim$rare, read1 = sim$common), "negative_binomial")
+  expect_rare_allele(fit, 1, "ref", "alt", sim$truth)
+})
+
+test_that("count model with long-format input labels the rare allele correctly", {
+  sim <- simulate_rare_allele()
+
+  fit <- fit_rare_allele(rare_allele_long(sim, "T", "A"), "negative_binomial")
+  expect_rare_allele(fit, "t1", "T", "A", sim$truth)
+
+  fit <- fit_rare_allele(rare_allele_long(sim, "A", "T"), "negative_binomial")
+  expect_rare_allele(fit, "t1", "A", "T", sim$truth)
+})
+
+test_that("categorical model with matrix input labels the rare allele correctly", {
+  sim <- simulate_rare_allele()
+
+  fit <- fit_rare_allele(counts_to_categorical(sim$common, sim$rare), "categorical")
+  expect_rare_allele(fit, 1, "alt", "ref", sim$truth)
+
+  fit <- fit_rare_allele(counts_to_categorical(sim$rare, sim$common), "categorical")
+  expect_rare_allele(fit, 1, "ref", "alt", sim$truth)
+})
+
+test_that("categorical model with long-format input labels the rare allele correctly", {
+  sim <- simulate_rare_allele()
+
+  fit <- fit_rare_allele(rare_allele_long(sim, "T", "A"), "categorical")
+  expect_rare_allele(fit, "t1", "T", "A", sim$truth)
+
+  fit <- fit_rare_allele(rare_allele_long(sim, "A", "T"), "categorical")
+  expect_rare_allele(fit, "t1", "A", "T", sim$truth)
+})
