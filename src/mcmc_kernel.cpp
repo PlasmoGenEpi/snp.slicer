@@ -700,7 +700,8 @@ Rcpp::List cpp_update_a(Rcpp::NumericMatrix A,
                         Rcpp::Nullable<Rcpp::NumericVector> loglik_const = R_NilValue,
                         Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   snp_slicer::kernel::SliceState state;
-  state.A = A;
+  // update_a writes A in place; clone so the caller's matrix is left untouched.
+  state.A = Rcpp::clone(A);
   state.D = D;
   state.mu = mu;
   state.kplus = kplus;
@@ -733,7 +734,8 @@ Rcpp::List cpp_update_a_multinomial(Rcpp::NumericMatrix A,
                                     Rcpp::IntegerVector col_offset,
                                     Rcpp::NumericMatrix r_totals) {
   snp_slicer::kernel::SliceState state;
-  state.A = A;
+  // update_a_multinomial writes A in place; clone so the caller's matrix is left untouched.
+  state.A = Rcpp::clone(A);
   state.mu = mu;
   state.kplus = kplus;
   state.kstar = kstar;
@@ -761,7 +763,8 @@ Rcpp::NumericMatrix cpp_update_d(Rcpp::NumericMatrix A,
                                  Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   snp_slicer::kernel::SliceState state;
   state.A = A;
-  state.D = D;
+  // update_d writes D in place; clone so the caller's matrix is left untouched.
+  state.D = Rcpp::clone(D);
   state.kmin = kmin;
   state.kstar = kstar;
 
@@ -798,9 +801,11 @@ Rcpp::List cpp_slice_iter(Rcpp::NumericMatrix A,
                           Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
-  state.A = A;
-  state.D = D;
-  state.mu = mu;
+  // The updates write A, D and mu in place. R callers keep earlier states alive
+  // (the MAP state, stored samples), so work on copies rather than the inputs.
+  state.A = Rcpp::clone(A);
+  state.D = Rcpp::clone(D);
+  state.mu = Rcpp::clone(mu);
   state.kplus = kplus;
   state.kstar = kstar;
   state.kmin = kmin;

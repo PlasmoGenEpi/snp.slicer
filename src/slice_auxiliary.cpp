@@ -187,9 +187,10 @@ Rcpp::List cpp_update_s(Rcpp::NumericMatrix A,
                         int P) {
   Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
-  state.A = A;
-  state.D = D;
-  state.mu = mu;
+  // Clone so the caller's objects are never written through.
+  state.A = Rcpp::clone(A);
+  state.D = Rcpp::clone(D);
+  state.mu = Rcpp::clone(mu);
   state.ktrunc = ktrunc;
 
   snp_slicer::kernel::ModelData model;
@@ -219,7 +220,8 @@ Rcpp::NumericVector cpp_update_mu(Rcpp::NumericMatrix A,
   Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
   state.A = A;
-  state.mu = mu;
+  // update_mu writes mu in place; clone so the caller's vector is left untouched.
+  state.mu = Rcpp::clone(mu);
   state.kplus = kplus;
   state.ktrunc = ktrunc;
 
