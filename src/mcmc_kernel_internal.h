@@ -8,7 +8,9 @@
 namespace snp_slicer {
 namespace kernel {
 
-// obs_code layout (length N*P, column-major): 0 = NA/skip, 1 = y==0, 2 = y>0
+// obs_code layout (length N*P, column-major): 0 = NA/skip, 1 = y==0, 2 = y>0.
+// Count-model cells with zero coverage (y == 0 and r == 0) are also skipped: they
+// contribute 0 to the log-likelihood under every count model.
 constexpr int OBS_SKIP = 0;
 constexpr int OBS_Y_ZERO = 1;
 constexpr int OBS_Y_POS = 2;
@@ -91,7 +93,7 @@ inline void fill_loglik_const_buffer(ModelData& model) {
                               static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
       switch (model.model_type) {
       case POISSON:
-        out[idx] = dpois_log_const(y);
+        out[idx] = dpois_log_const(y, r);
         break;
       case BINOMIAL:
         out[idx] = dbinom_log_const(y, r);
@@ -113,12 +115,15 @@ inline void fill_obs_code_buffer(ModelData& model) {
   const int P = model.obs.P;
   model.obs_code_vec = Rcpp::IntegerVector(N * P);
   int* const out = model.obs_code_vec.begin();
+  const bool count_model = model.model_type != CATEGORICAL;
   for (int p = 0; p < P; ++p) {
     for (int i = 0; i < N; ++i) {
       const double y = model.obs.y_at(i, p);
       const std::size_t idx = static_cast<std::size_t>(i) +
                               static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
       if (ISNA(y)) {
+        out[idx] = OBS_SKIP;
+      } else if (count_model && y == 0.0 && model.obs.r_at(i, p) <= 0.0) {
         out[idx] = OBS_SKIP;
       } else if (y == 0.0) {
         out[idx] = OBS_Y_ZERO;

@@ -9,9 +9,10 @@
 logprior_a <- function(A, mu, alpha) {
   start_timer("logprior_a")
   
-  # IBP prior for allocation matrix
-  lpr <- sum(t(A) * log(mu))
-  lpr <- lpr + sum(t(1 - A) * log(1 - mu))
+  # IBP prior for allocation matrix. Column k holds m[k] ones and N - m[k]
+  # zeros, so the Bernoulli terms collapse to column counts.
+  m <- colSums(A)
+  lpr <- sum(m * log(mu)) + sum((nrow(A) - m) * log(1 - mu))
   
   end_timer("logprior_a")
   return(lpr)

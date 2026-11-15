@@ -139,3 +139,44 @@ test_that("categorical_prop_bin_vec agrees with the scalar bin function", {
     vapply(probs, snp.slicer:::categorical_prop_bin, integer(1))
   )
 })
+
+test_that("categorical_compatible_strains matches a strain-by-strain comparison", {
+  # Reference: compare each strain's row with the specimen's 0/1 calls
+  reference <- function(y_row, D, fallback) {
+    observed <- which(!is.na(y_row) & (y_row == 0 | y_row == 1))
+    if (length(observed) == 0L) {
+      return(seq_len(nrow(D)))
+    }
+    keep <- which(apply(D[, observed, drop = FALSE], 1L,
+                        function(d) all(d == y_row[observed])))
+    if (length(keep) == 0L) fallback else keep
+  }
+
+  set.seed(31L)
+  D <- matrix(as.numeric(stats::runif(12 * 6) < 0.5), nrow = 12, ncol = 6)
+  D <- rbind(D, D[1:3, ])  # duplicate strains, so several can be compatible
+  for (i in seq_len(60)) {
+    y_row <- sample(c(0, 0.5, 1, NA), ncol(D), replace = TRUE, prob = c(0.3, 0.3, 0.3, 0.1))
+    if (i <= 20) {
+      # Calls taken from a real strain, so at least one strain is compatible
+      strain <- D[sample.int(nrow(D), 1), ]
+      y_row[!is.na(y_row) & y_row != 0.5] <- strain[!is.na(y_row) & y_row != 0.5]
+    }
+    expect_identical(
+      snp.slicer:::categorical_compatible_strains(y_row, D, fallback = 2L),
+      reference(y_row, D, fallback = 2L)
+    )
+  }
+
+  # No 0/1 calls at all: every strain is compatible
+  expect_identical(
+    snp.slicer:::categorical_compatible_strains(c(NA, 0.5, 0.5, NA, 0.5, NA), D, fallback = 2L),
+    seq_len(nrow(D))
+  )
+  # A logical dictionary gives the same answer as a numeric one
+  y_row <- c(D[4, 1:3], NA, 0.5, NA)
+  expect_identical(
+    snp.slicer:::categorical_compatible_strains(y_row, D > 0, fallback = 2L),
+    reference(y_row, D, fallback = 2L)
+  )
+})

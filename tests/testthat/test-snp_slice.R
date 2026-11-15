@@ -156,3 +156,36 @@ test_that("snp_slice stores MCMC samples when requested", {
   expect_true(is.list(get_chain(result_with_samples)$mcmc_samples))
   expect_equal(length(get_chain(result_with_samples)$mcmc_samples), 25)
 })
+
+test_that("snp_slice passes threshold through to state initialization", {
+  test_data <- list(
+    read1 = matrix(c(10, 5, 15, 8), nrow = 2),
+    read0 = matrix(c(90, 95, 85, 92), nrow = 2)
+  )
+  processed <- preprocess_data(test_data, "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed)
+
+  seen <- NULL
+  initialize_state <- model_obj$initialize_state
+  model_obj$initialize_state <- function(model_obj, threshold) {
+    seen <<- threshold
+    initialize_state(model_obj, threshold = threshold)
+  }
+  run_chain(model_obj, n_sample = 2, n_burnin = 0, gap = NULL, verbose = FALSE,
+            store_mcmc = FALSE, seed = 1, threshold = 0.2)
+  expect_equal(seen, 0.2)
+
+  # End to end: snp_slice() hands its threshold to the chain
+  seen <- NULL
+  testthat::local_mocked_bindings(
+    run_chain = function(..., threshold) {
+      seen <<- threshold
+      stop("stopped after capturing threshold")
+    }
+  )
+  expect_error(
+    snp_slice(test_data, n_sample = 5, n_burnin = 0, threshold = 0.3, verbose = FALSE),
+    "stopped after capturing threshold"
+  )
+  expect_equal(seen, 0.3)
+})

@@ -365,3 +365,222 @@ test_that("snp_slice still runs with compiled kernel when available", {
   result <- snp_slice(make_count_fixture(), n_sample = 10, n_burnin = 5, verbose = FALSE)
   expect_s3_class(result, "snp_slice_results")
 })
+
+#' Mixed and single infections over a handful of strains, large enough that
+#' the compiled updates change A, D and mu on most iterations.
+make_mixing_count_fixture <- function() {
+  set.seed(101L)
+  n_host <- 16L
+  n_target <- 12L
+  strains <- matrix(stats::rbinom(4L * n_target, 1L, 0.4), nrow = 4L)
+  allocation <- matrix(0, nrow = n_host, ncol = 4L)
+  for (i in seq_len(n_host)) {
+    allocation[i, sample.int(4L, if (i <= 6L) 1L else 2L)] <- 1
+  }
+  prop <- (allocation %*% strains) / rowSums(allocation)
+  read1 <- matrix(stats::rbinom(n_host * n_target, 100L, prop), nrow = n_host)
+  list(read1 = read1, read0 = 100 - read1)
+}
+
+test_that("compiled A/D kernel matches R reference on mixed infections for every count model", {
+  skip_if_not(cpp_kernel_available())
+
+  # Specimens here carry several strains, so update_a sees a range of j / n
+  # proportions rather than the 0 and 1 of the two-specimen fixtures.
+  for (model_name in c("poisson", "binomial", "negative_binomial")) {
+    processed <- preprocess_data(make_mixing_count_fixture(), model_name)
+    model_obj <- create_model(model_name, processed)
+    states <- expect_kernel_matches_r(model_obj, n_iter = 5L)
+    expect_gt(max(rowSums(states$cpp$A)), 1)
+  }
+})
+
+test_that("compiled A/D kernel matches R reference on categorical mixed infections", {
+  skip_if_not(cpp_kernel_available())
+
+  fixture <- make_mixing_count_fixture()
+  y_cat <- counts_to_categorical(fixture$read0, fixture$read1)
+  expect_true(any(y_cat == 0.5, na.rm = TRUE))
+  model_obj <- create_model("categorical", preprocess_data(y_cat, "categorical"))
+
+  states <- expect_kernel_matches_r(model_obj, n_iter = 5L)
+  expect_gt(max(rowSums(states$cpp$A)), 1)
+})
+
+test_that("compiled kernel entry points leave their inputs unmodified", {
+  skip_if_not(cpp_kernel_available())
+
+  processed <- preprocess_data(make_mixing_count_fixture(), "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed)
+  model_obj <- setup_mcmc_kernel(model_obj, backend = "cpp")
+
+  updates <- list(
+    iter = kernel_update_iter_cpp,
+    s = kernel_update_s_cpp,
+    a = kernel_update_a_cpp,
+    d = kernel_update_d_cpp,
+    mu = kernel_update_mu_cpp
+  )
+
+  for (label in names(updates)) {
+    set.seed(5L)
+    state <- model_obj$initialize_state(model_obj, threshold = 0.001)
+    state <- slice_init(state, model_obj)
+    storage.mode(state$A) <- "double"
+    storage.mode(state$D) <- "double"
+
+    changed <- FALSE
+    for (iter in seq_len(10L)) {
+      # Arithmetic forces fresh copies that share no memory with the state.
+      before <- list(A = state$A + 0, D = state$D + 0, mu = state$mu + 0)
+      updated <- updates[[label]](state, model_obj)
+
+      expect_identical(state$A, before$A, info = label)
+      expect_identical(state$D, before$D, info = label)
+      expect_identical(state$mu, before$mu, info = label)
+
+      changed <- changed ||
+        !identical(updated$A, before$A) ||
+        !identical(updated$D, before$D) ||
+        !identical(updated$mu, before$mu)
+      # Advance with a full iteration so every update sees a moving state.
+      state <- kernel_update_iter_cpp(updated, model_obj)
+    }
+    # Guard against a vacuous pass: the update must have changed something.
+    expect_true(changed, info = label)
+  }
+})
+
+test_that("compiled multinomial updates leave their inputs unmodified", {
+  skip_if_not(cpp_kernel_available())
+
+  processed <- preprocess_data(make_mixing_count_fixture(), "multinomial")
+  model_obj <- create_model("multinomial", processed)
+  model_obj <- setup_mcmc_kernel(model_obj, backend = "cpp")
+  kernel <- model_obj$kernel
+  expect_equal(kernel$name, "cpp_multinomial")
+
+  for (label in intersect(c("update_iter", "update_a", "update_d"), names(kernel))) {
+    set.seed(5L)
+    state <- model_obj$initialize_state(model_obj, threshold = 0.001)
+    state <- slice_init(state, model_obj)
+    storage.mode(state$A) <- "double"
+
+    changed <- FALSE
+    for (iter in seq_len(10L)) {
+      before <- list(A = state$A + 0, D = state$D + 0L, mu = state$mu + 0)
+      updated <- kernel[[label]](state, model_obj)
+
+      expect_identical(state$A, before$A, info = label)
+      expect_equal(state$D, before$D, info = label)
+      expect_identical(state$mu, before$mu, info = label)
+
+      changed <- changed ||
+        !identical(updated$A, before$A) ||
+        !isTRUE(all.equal(updated$D, before$D))
+      state <- slice_iter(updated, model_obj)
+    }
+    expect_true(changed, info = label)
+  }
+})
+
+test_that("stored samples and the MAP state are snapshots under the compiled kernel", {
+  skip_if_not(cpp_kernel_available())
+
+  old_opt <- options(snp.slicer.mcmc_kernel = "cpp")
+  on.exit(options(old_opt), add = TRUE)
+
+  n_burnin <- 5L
+  result <- snp_slice(make_mixing_count_fixture(), model = "negative_binomial",
+                      n_sample = 40, n_burnin = n_burnin, seed = 9, verbose = FALSE,
+                      store_mcmc = TRUE)
+  chain <- result$chains[[1]]
+  samples <- chain$mcmc_samples
+  model_obj <- create_model("negative_binomial", result$model_info$processed_data)
+
+  # Each stored state must reproduce the log posterior recorded alongside it.
+  recomputed <- vapply(samples, function(s) {
+    model_obj$loglikelihood_matrix(s$A, s$D, model_obj) +
+      logprior_a(s$A, s$mu, model_obj$alpha) +
+      logprior_mu(s$mu, model_obj$alpha, model_obj$N) +
+      logprior_d(s$D, model_obj$rho)
+  }, numeric(1))
+  stored <- vapply(samples, function(s) s$logpost, numeric(1))
+  expect_equal(recomputed, stored, tolerance = 1e-8)
+  expect_gt(length(unique(stored)), 1L)
+
+  # The MAP estimate is the state at the MAP iteration, not a later one.
+  map_sample <- samples[[chain$diagnostics$map_iteration - n_burnin]]
+  expect_equal(map_sample$logpost, chain$diagnostics$map_logpost)
+  map_matrices <- active_state_matrices(map_sample)
+  expect_equal(chain$map_allocation_matrix, map_matrices$allocation_matrix)
+  expect_equal(chain$map_dictionary_matrix, map_matrices$dictionary_matrix)
+})
+
+#' Matrix-list counts where one specimen has no reads at one target.
+make_count_fixture_with_zero_coverage <- function() {
+  fixture <- make_mixing_count_fixture()
+  fixture$read1[3, 2] <- 0
+  fixture$read0[3, 2] <- 0
+  fixture
+}
+
+test_that("compiled kernel matches R on count models with zero-coverage cells", {
+  skip_if_not(cpp_kernel_available())
+
+  for (model_name in c("poisson", "binomial", "negative_binomial")) {
+    processed <- preprocess_data(make_count_fixture_with_zero_coverage(), model_name)
+    model_obj <- create_model(model_name, processed)
+    expect_true(any(model_obj$r == 0))
+
+    model_obj <- ensure_kernel_obs_cache(model_obj)
+    expect_true(all(is.finite(model_obj$kernel_loglik_const)), info = model_name)
+
+    states <- expect_kernel_matches_r(model_obj, n_iter = 3L)
+    expect_true(is.finite(states$cpp$logpost), info = model_name)
+  }
+})
+
+test_that("snp_slice runs with the compiled kernel on zero-coverage cells", {
+  skip_if_not(cpp_kernel_available())
+
+  old_opt <- options(snp.slicer.mcmc_kernel = "cpp")
+  on.exit(options(old_opt), add = TRUE)
+  result <- snp_slice(make_count_fixture_with_zero_coverage(), model = "negative_binomial",
+                      n_sample = 10, n_burnin = 5, seed = 2, verbose = FALSE)
+  expect_true(is.finite(result$chains[[1]]$diagnostics$final_logpost))
+})
+
+test_that("logprior_a equals the elementwise Bernoulli log prior", {
+  set.seed(21L)
+  A <- matrix(as.numeric(stats::runif(15 * 6) < 0.4), nrow = 15, ncol = 6)
+  A[, 6] <- 0
+  mu <- sort(stats::runif(6, 0.01, 0.9), decreasing = TRUE)
+
+  elementwise <- sum(t(A) * log(mu)) + sum(t(1 - A) * log(1 - mu))
+  expect_equal(logprior_a(A, mu, alpha = 2.6), elementwise, tolerance = 1e-12)
+})
+
+test_that("R reference update_d leaves fixed strains alone when kmin exceeds kstar", {
+  # Every specimen is a single infection, so kmin = kstar + 1 and there is no
+  # strain for update_d to resample.
+  strains <- rbind(c(1, 0, 0, 1), c(0, 1, 1, 0))
+  alt <- strains[rep(1:2, each = 3), ]
+  processed <- preprocess_data(list(read1 = alt * 100, read0 = (1 - alt) * 100),
+                               "negative_binomial")
+  model_obj <- create_model("negative_binomial", processed, rho = 0.3)
+
+  set.seed(3L)
+  state <- model_obj$initialize_state(model_obj, threshold = 0.001)
+  state <- slice_init(state, model_obj)
+  expect_gt(state$kmin, state$kstar)
+
+  # A dictionary entry the data contradicts: resampling strain kstar would
+  # flip it back, so an unchanged D shows the strain was not touched.
+  hosts <- which(state$A[, state$kstar] > 0)
+  target <- which(processed$y[hosts[1], ] > 0)[1]
+  state$D[state$kstar, target] <- 0
+
+  updated <- slice_update_d_r(state, model_obj)
+  expect_identical(updated$D, state$D)
+})

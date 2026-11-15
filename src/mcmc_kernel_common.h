@@ -37,6 +37,13 @@ inline int prop_bin(double prop) {
   return 2;
 }
 
+// prop_bin(j / n) for integers 0 <= j <= n, without the division. The two agree
+// exactly: j / n and 0.99 can only round to the same double when j / n == 99 / 100.
+inline int prop_bin_int(int j, int n) {
+  if (j <= 0) return 0;
+  return (100 * j <= 99 * n) ? 1 : 2;
+}
+
 inline int y_bin(double y) {
   if (ISNA(y)) return -1;
   if (y == 0.0) return 0;
@@ -62,17 +69,23 @@ inline double dbinom_log_native(double y, double n, double p) {
          + y * std::log(p) + (n - y) * std::log(q);
 }
 
+// size == 0 is a point mass at y == 0 (as stats::dnbinom); without this guard
+// lgamma(0) - lgamma(0) yields NaN for zero-coverage cells.
 inline double dnbinom_log_native(double y, double r, double prop) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
   const double p = 1.0 / (1.0 + prop);
   const double q = 1.0 - p;
   return std::lgamma(y + r) - std::lgamma(r) - std::lgamma(y + 1.0)
          + r * std::log(p) + y * std::log(q);
 }
 
-inline double dpois_log_const(double y) {
+// log dpois(y; r * prop) = [y * log(r) - lgamma(y + 1)] + y * log(prop) - r * prop;
+// the bracketed part does not depend on prop.
+inline double dpois_log_const(double y, double r) {
   if (ISNA(y)) return 0.0;
-  return -std::lgamma(y + 1.0);
+  if (y == 0.0) return 0.0;
+  return y * std::log(r) - std::lgamma(y + 1.0);
 }
 
 inline double dbinom_log_const(double y, double n) {
@@ -82,6 +95,7 @@ inline double dbinom_log_const(double y, double n) {
 
 inline double dnbinom_log_const(double y, double r) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
   return std::lgamma(y + r) - std::lgamma(r) - std::lgamma(y + 1.0);
 }
 
@@ -89,7 +103,7 @@ SNP_SLICER_HOT double dpois_log_fast(double prop, double r, double y, double log
   if (ISNA(y)) return 0.0;
   const double lambda = r * prop;
   if (lambda <= 0.0) return (y == 0.0) ? 0.0 : R_NegInf;
-  return loglik_const + y * std::log(lambda) - lambda;
+  return loglik_const + y * std::log(prop) - lambda;
 }
 
 SNP_SLICER_HOT double dbinom_log_fast(double prop, double n, double y, double loglik_const) {
@@ -105,9 +119,19 @@ SNP_SLICER_HOT double dbinom_log_fast(double prop, double n, double y, double lo
 
 SNP_SLICER_HOT double dnbinom_log_fast(double prop, double r, double y, double loglik_const) {
   if (ISNA(y)) return 0.0;
+  if (r <= 0.0) return loglik_const;
   const double p = 1.0 / (1.0 + prop);
   const double q = 1.0 - p;
   return loglik_const + r * std::log(p) + y * std::log(q);
+}
+
+// The models whose cell likelihood is a function of an integer ratio j / n and
+// can therefore be evaluated from a table of log(integer). MULTINOMIAL is not
+// one of them here: it has its own locus-aware kernel and otherwise goes
+// through the generic per-cell helpers below.
+inline bool is_binary_count_model(int model_type) {
+  return model_type == POISSON || model_type == BINOMIAL ||
+         model_type == NEGATIVE_BINOMIAL;
 }
 
 // One allele-slot cell of the multinomial kernel term. Reads for an allele no
@@ -229,9 +253,13 @@ inline double gridsample_bounds(double lb, double ub,
 }
 
 inline double logf_newfeature(double x, int N, double alpha) {
+  // sum_{i=1}^{N} (1 - x)^i / i, with the power carried as a running product
+  const double q = 1.0 - x;
   double logf = 0.0;
+  double power = 1.0;
   for (int i = 1; i <= N; ++i) {
-    logf += std::pow(1.0 - x, i) / static_cast<double>(i);
+    power *= q;
+    logf += power / static_cast<double>(i);
   }
   return alpha * logf + (alpha - 1.0) * std::log(x) + N * std::log(1.0 - x);
 }

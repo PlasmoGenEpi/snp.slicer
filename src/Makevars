@@ -1,0 +1,4 @@
+# Keep Eigen single-threaded. The kernel's matrix products are far too small to
+# benefit from threading, and when the compiler flags enable OpenMP Eigen would
+# otherwise start a thread pool per chain and oversubscribe the cores.
+PKG_CPPFLAGS = -DEIGEN_DONT_PARALLELIZE

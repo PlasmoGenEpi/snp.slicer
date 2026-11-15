@@ -12,7 +12,8 @@ run_chain(
   verbose,
   store_mcmc,
   chain_id = 1L,
-  seed = NULL
+  seed = NULL,
+  threshold = 0.001
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ run_chain(
 \item{chain_id}{Integer identifier of this chain (1 when running one chain)}
 
 \item{seed}{Integer seed for this chain}
+
+\item{threshold}{Threshold for identifying single infections at initialization}
 }
 \value{
 MCMC results

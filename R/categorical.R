@@ -77,8 +77,13 @@ categorical_compatible_strains <- function(y_row, D, fallback) {
   if (length(observed) == 0L) {
     return(seq_len(nrow(D)))
   }
-  keep <- which(apply(D[, observed, drop = FALSE], 1L,
-                      function(d) all(d == y_row[observed])))
+  # A strain is compatible when it mismatches none of the observed calls. With
+  # 0/1 values the mismatch count is a pair of matrix products, which avoids an
+  # R-level loop over strains.
+  y_obs <- y_row[observed]
+  D_obs <- D[, observed, drop = FALSE]
+  mismatches <- as.vector(D_obs %*% (1 - y_obs) + (1 - D_obs) %*% y_obs)
+  keep <- which(mismatches == 0)
   if (length(keep) == 0L) fallback else keep
 }
 

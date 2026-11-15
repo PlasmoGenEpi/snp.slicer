@@ -21,6 +21,44 @@ namespace snp_slicer {
 namespace kernel {
 namespace {
 
+// log_int[m] = log(m) for m = 0..max_value, with log_int[0] = -Inf.
+std::vector<double> make_log_int_table(int max_value) {
+  std::vector<double> log_int(static_cast<std::size_t>(max_value) + 1);
+  log_int[0] = R_NegInf;
+  for (std::size_t m = 1; m < log_int.size(); ++m) {
+    log_int[m] = std::log(static_cast<double>(m));
+  }
+  return log_int;
+}
+
+// Log-likelihood of one count-model cell when the strain proportion is j / n
+// for integers 0 <= j <= n, as it is whenever A and D are binary. With the
+// table from make_log_int_table() the hot loops take no logarithms. `c` is the
+// cell's cached loglik_const term.
+inline double count_loglik_int(int j, int n, double inv_n, double y, double r,
+                               double c, int code, int model_type,
+                               const double* log_int) {
+  if (model_type == NEGATIVE_BINOMIAL) {
+    // prob = n / (n + j)
+    const double log_den = log_int[n + j];
+    double value = c + r * (log_int[n] - log_den);
+    if (code != OBS_Y_ZERO) value += y * (log_int[j] - log_den);
+    return value;
+  }
+  if (model_type == BINOMIAL) {
+    if (j <= 0) return (code == OBS_Y_ZERO) ? 0.0 : R_NegInf;
+    if (j >= n) return (y == r) ? 0.0 : R_NegInf;
+    const double log_n = log_int[n];
+    if (code == OBS_Y_ZERO) return c + r * (log_int[n - j] - log_n);
+    return c + y * (log_int[j] - log_n) + (r - y) * (log_int[n - j] - log_n);
+  }
+  // POISSON: lambda = r * j / n; y * log(r) is already in c
+  const double lambda = r * (static_cast<double>(j) * inv_n);
+  if (lambda <= 0.0) return (code == OBS_Y_ZERO) ? 0.0 : R_NegInf;
+  if (code == OBS_Y_ZERO) return c - lambda;
+  return c + y * (log_int[j] - log_int[n]) - lambda;
+}
+
 double loglik_target_col_active(const std::vector<int>& active_hosts,
                                 const double* ad_col,
                                 const double* A_col,
@@ -178,6 +216,22 @@ void update_a(SliceState& state, ModelData& model) {
     log_1m_mu[static_cast<std::size_t>(k)] = std::log(1.0 - mu[k]);
   }
 
+  const int model_type = model.model_type;
+  // Poisson, binomial and negative binomial with the obs cache attached take
+  // their log terms from the integer table.
+  const bool use_obs_layout =
+    snp_slicer::is_binary_count_model(model_type) &&
+    obs.has_loglik_const() &&
+    obs.has_obs_code();
+
+  // A specimen carries at most K strains, so every proportion is j / n with
+  // n <= K and the negative binomial needs log(n + j) <= log(2K).
+  const std::vector<double> log_int_tab = make_log_int_table(2 * K + 1);
+  const double* log_int = log_int_tab.data();
+  // Categorical model: the lookup-table column for each target's observation,
+  // or nullptr where the observation is missing.
+  std::vector<const double*> llik_col_row(static_cast<std::size_t>(P), nullptr);
+
   for (int m = 0; m < mixed.size(); ++m) {
     const int host = mixed[m] - 1;
 
@@ -185,10 +239,12 @@ void update_a(SliceState& state, ModelData& model) {
     double* full_ptr = full_row.data();
     double row_sum = A_e.row(host).sum();
 
-    const bool use_obs_layout =
-      model.model_type != CATEGORICAL &&
-      obs.has_loglik_const() &&
-      obs.has_obs_code();
+    // The log-likelihood of the specimen's current row is kept, so each
+    // proposal evaluates only the flipped state. It is always assigned from a
+    // full sum, never incremented, so it cannot drift.
+    double cur_ll = 0.0;
+    double alt_ll = 0.0;
+    bool cur_ll_stale = true;
 
     if (use_obs_layout) {
       for (int p = 0; p < P; ++p) {
@@ -196,6 +252,12 @@ void update_a(SliceState& state, ModelData& model) {
         r_row[static_cast<std::size_t>(p)] = obs.r_at(host, p);
         c_row[static_cast<std::size_t>(p)] = obs.loglik_const_at(host, p);
         code_row[static_cast<std::size_t>(p)] = obs.obs_code_at(host, p);
+      }
+    } else if (model_type == CATEGORICAL) {
+      for (int p = 0; p < P; ++p) {
+        const int yb = y_bin(obs.y_at(host, p));
+        llik_col_row[static_cast<std::size_t>(p)] =
+          yb < 0 ? nullptr : obs.llik_tab + yb * obs.llik_tab_nrow;
       }
     } else {
       for (int p = 0; p < P; ++p) {
@@ -215,6 +277,7 @@ void update_a(SliceState& state, ModelData& model) {
           const double delta = A(host, k_idx) - old_a;
           full_row += delta * D_e.row(k_idx);
           row_sum += delta;
+          cur_ll_stale = true;
           col_tracker.apply_delta(k_idx, delta);
           if (A(host, k_idx) == 1.0) {
             kstar = std::max(kstar, k);
@@ -228,68 +291,70 @@ void update_a(SliceState& state, ModelData& model) {
       double logp0 = log_1m_mu[static_cast<std::size_t>(k_idx)];
       double logp1 = log_mu[static_cast<std::size_t>(k_idx)];
 
-      if (model.model_type == CATEGORICAL) {
-        for (int p = 0; p < P; ++p) {
-          if (obs.has_obs_code() && obs.obs_code_at(host, p) == OBS_SKIP) {
-            continue;
+      if (model_type == CATEGORICAL) {
+        if (cur_ll_stale) {
+          const int n_cur = static_cast<int>(row_sum);
+          double acc = 0.0;
+          for (int p = 0; p < P; ++p) {
+            const double* col = llik_col_row[static_cast<std::size_t>(p)];
+            if (col == nullptr) continue;
+            acc += col[prop_bin_int(static_cast<int>(full_ptr[p]), n_cur)];
           }
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 / a0;
-          const double prop1 = (ad0 + d_kp) / (a0 + 1.0);
-          const double yp = obs.has_obs_code()
-            ? obs.y_at(host, p)
-            : y_row[static_cast<std::size_t>(p)];
-          logp0 += loglik_categorical_value(yp, prop0, obs.llik_tab, obs.llik_tab_nrow);
-          logp1 += loglik_categorical_value(yp, prop1, obs.llik_tab, obs.llik_tab_nrow);
+          cur_ll = acc;
+          cur_ll_stale = false;
         }
-      } else if (use_obs_layout && model.model_type == NEGATIVE_BINOMIAL) {
-        const double inv_a0 = 1.0 / a0;
-        const double inv_a1 = 1.0 / (a0 + 1.0);
+
+        const bool has_k = old_a == 1.0;
+        const int n_alt = static_cast<int>(a0) + (has_k ? 0 : 1);
+        const int sign = has_k ? -1 : 1;
+        const double* d_row = D_ptr + k_idx;
+        double alt = 0.0;
         for (int p = 0; p < P; ++p) {
-          const int code = code_row[static_cast<std::size_t>(p)];
-          if (code == OBS_SKIP) continue;
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 * inv_a0;
-          const double prop1 = (ad0 + d_kp) * inv_a1;
-          const double c = c_row[static_cast<std::size_t>(p)];
-          const double rp = r_row[static_cast<std::size_t>(p)];
-          if (code == OBS_Y_ZERO) {
-            const double p0 = 1.0 / (1.0 + prop0);
-            const double p1 = 1.0 / (1.0 + prop1);
-            logp0 += c + rp * std::log(p0);
-            logp1 += c + rp * std::log(p1);
-          } else {
-            const double yp = y_row[static_cast<std::size_t>(p)];
-            const double p0 = 1.0 / (1.0 + prop0);
-            const double p1 = 1.0 / (1.0 + prop1);
-            logp0 += c + rp * std::log(p0) + yp * std::log(1.0 - p0);
-            logp1 += c + rp * std::log(p1) + yp * std::log(1.0 - p1);
-          }
+          const std::size_t sp = static_cast<std::size_t>(p);
+          const double* col = llik_col_row[sp];
+          if (col == nullptr) continue;
+          const int d_kp = static_cast<int>(d_row[sp * static_cast<std::size_t>(K)]);
+          alt += col[prop_bin_int(static_cast<int>(full_ptr[p]) + sign * d_kp, n_alt)];
         }
+        alt_ll = alt;
+        logp0 += has_k ? alt : cur_ll;
+        logp1 += has_k ? cur_ll : alt;
       } else if (use_obs_layout) {
-        const double inv_a0 = 1.0 / a0;
-        const double inv_a1 = 1.0 / (a0 + 1.0);
-        const int model_type = model.model_type;
-        for (int p = 0; p < P; ++p) {
-          const int code = code_row[static_cast<std::size_t>(p)];
-          if (code == OBS_SKIP) continue;
-          const double d_kp = D_ptr[k_idx + p * K];
-          const double ad0 = full_ptr[p] - old_a * d_kp;
-          const double prop0 = ad0 * inv_a0;
-          const double prop1 = (ad0 + d_kp) * inv_a1;
-          const double c = c_row[static_cast<std::size_t>(p)];
-          const double rp = r_row[static_cast<std::size_t>(p)];
-          if (code == OBS_Y_ZERO) {
-            logp0 += count_loglik_y0_fast(prop0, rp, c, model_type);
-            logp1 += count_loglik_y0_fast(prop1, rp, c, model_type);
-          } else {
-            const double yp = y_row[static_cast<std::size_t>(p)];
-            logp0 += loglik_value_fast(prop0, yp, rp, c, model_type);
-            logp1 += loglik_value_fast(prop1, yp, rp, c, model_type);
+        if (cur_ll_stale) {
+          const int n_cur = static_cast<int>(row_sum);
+          const double inv_cur = 1.0 / static_cast<double>(n_cur);
+          double acc = 0.0;
+          for (int p = 0; p < P; ++p) {
+            const std::size_t sp = static_cast<std::size_t>(p);
+            const int code = code_row[sp];
+            if (code == OBS_SKIP) continue;
+            acc += count_loglik_int(
+              static_cast<int>(full_ptr[p]), n_cur, inv_cur, y_row[sp], r_row[sp],
+              c_row[sp], code, model_type, log_int);
           }
+          cur_ll = acc;
+          cur_ll_stale = false;
         }
+
+        // The flipped state: one strain fewer if the specimen carries k, one more if not.
+        const bool has_k = old_a == 1.0;
+        const int n_alt = static_cast<int>(a0) + (has_k ? 0 : 1);
+        const double inv_alt = 1.0 / static_cast<double>(n_alt);
+        const int sign = has_k ? -1 : 1;
+        const double* d_row = D_ptr + k_idx;
+        double alt = 0.0;
+        for (int p = 0; p < P; ++p) {
+          const std::size_t sp = static_cast<std::size_t>(p);
+          const int code = code_row[sp];
+          if (code == OBS_SKIP) continue;
+          const int d_kp = static_cast<int>(d_row[sp * static_cast<std::size_t>(K)]);
+          alt += count_loglik_int(
+            static_cast<int>(full_ptr[p]) + sign * d_kp, n_alt, inv_alt, y_row[sp],
+            r_row[sp], c_row[sp], code, model_type, log_int);
+        }
+        alt_ll = alt;
+        logp0 += has_k ? alt : cur_ll;
+        logp1 += has_k ? cur_ll : alt;
       } else {
         const double inv_a0 = 1.0 / a0;
         const double inv_a1 = 1.0 / (a0 + 1.0);
@@ -333,6 +398,7 @@ void update_a(SliceState& state, ModelData& model) {
         const double delta = A(host, k_idx) - old_a;
         full_row += delta * D_e.row(k_idx);
         row_sum += delta;
+        cur_ll = alt_ll;
         col_tracker.apply_delta(k_idx, delta);
         if (A(host, k_idx) == 1.0) {
           kstar = std::max(kstar, k);
@@ -405,7 +471,19 @@ void update_a_multinomial(SliceState& state,
   }
 
   std::vector<double> full_row(static_cast<std::size_t>(L));
-  std::vector<int> slot_of_k(static_cast<std::size_t>(P));
+
+  // slot_tab[k * P + p]: the allele slot strain k carries at target p. Stored
+  // by strain so the inner loops read it contiguously; D is fixed in this update.
+  std::vector<int> slot_tab(static_cast<std::size_t>(K) * static_cast<std::size_t>(P));
+  for (int p = 0; p < P; ++p) {
+    const int offset = col_offset[p];
+    for (int kk = 0; kk < K; ++kk) {
+      slot_tab[static_cast<std::size_t>(kk) * static_cast<std::size_t>(P) +
+               static_cast<std::size_t>(p)] = offset + d_at(kk, p);
+    }
+  }
+  // The specimen's read counts by slot, with missing counts stored as 0.
+  std::vector<double> y_host(static_cast<std::size_t>(L));
 
   for (int m = 0; m < mixed.size(); ++m) {
     const int host = mixed[m] - 1;
@@ -417,9 +495,14 @@ void update_a_multinomial(SliceState& state,
       const double a = A(host, kk);
       if (a <= 0.0) continue;
       row_sum += a;
+      const int* slots = slot_tab.data() + static_cast<std::size_t>(kk) * static_cast<std::size_t>(P);
       for (int p = 0; p < P; ++p) {
-        full_row[static_cast<std::size_t>(col_offset[p] + d_at(kk, p))] += a;
+        full_row[static_cast<std::size_t>(slots[p])] += a;
       }
+    }
+    for (int l = 0; l < L; ++l) {
+      const double y = counts_col[host + l * N];
+      y_host[static_cast<std::size_t>(l)] = ISNA(y) ? 0.0 : y;
     }
     // Total reads across observed targets: the a0 -> a0 + 1 normalisation
     // shift enters every read once.
@@ -434,16 +517,15 @@ void update_a_multinomial(SliceState& state,
       const double old_a = A(host, k_idx);
       const double a0 = row_sum - old_a;
 
-      for (int p = 0; p < P; ++p) {
-        slot_of_k[static_cast<std::size_t>(p)] = col_offset[p] + d_at(k_idx, p);
-      }
+      const int* slot_of_k =
+        slot_tab.data() + static_cast<std::size_t>(k_idx) * static_cast<std::size_t>(P);
 
       if (a0 == 0.0) {
         A(host, k_idx) = 1.0;
         if (A(host, k_idx) != old_a) {
           const double delta = A(host, k_idx) - old_a;
           for (int p = 0; p < P; ++p) {
-            full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+            full_row[static_cast<std::size_t>(slot_of_k[p])] += delta;
           }
           row_sum += delta;
           col_tracker.apply_delta(k_idx, delta);
@@ -462,9 +544,9 @@ void update_a_multinomial(SliceState& state,
       double lik_ratio = 0.0;
       bool without_k_impossible = false;
       for (int p = 0; p < P; ++p) {
-        const int slot = slot_of_k[static_cast<std::size_t>(p)];
-        const double y = counts_col[host + slot * N];
-        if (ISNA(y) || y == 0.0) continue;
+        const int slot = slot_of_k[p];
+        const double y = y_host[static_cast<std::size_t>(slot)];
+        if (y == 0.0) continue;
         const double c = full_row[static_cast<std::size_t>(slot)] - old_a;
         if (c <= 0.0) {
           without_k_impossible = true;
@@ -500,7 +582,7 @@ void update_a_multinomial(SliceState& state,
       if (A(host, k_idx) != old_a) {
         const double delta = A(host, k_idx) - old_a;
         for (int p = 0; p < P; ++p) {
-          full_row[static_cast<std::size_t>(slot_of_k[static_cast<std::size_t>(p)])] += delta;
+          full_row[static_cast<std::size_t>(slot_of_k[p])] += delta;
         }
         row_sum += delta;
         col_tracker.apply_delta(k_idx, delta);
@@ -547,6 +629,24 @@ void update_d(SliceState& state, ModelData& model) {
   const double log_rho = std::log(model.rho);
   const double log_1m_rho = std::log(1.0 - model.rho);
 
+  // Count models: proportions are (ad - d + {0, 1}) / an for integers, so both
+  // states of a dictionary entry come from the log table in one pass.
+  const int model_type = model.model_type;
+  const bool use_table =
+    snp_slicer::is_binary_count_model(model_type) &&
+    obs.has_loglik_const() && obs.has_obs_code();
+  std::vector<double> log_int_tab;
+  std::vector<double> inv_an;
+  if (use_table) {
+    log_int_tab = make_log_int_table(2 * K + 1);
+    inv_an.resize(static_cast<std::size_t>(N));
+    for (int i = 0; i < N; ++i) {
+      inv_an[static_cast<std::size_t>(i)] =
+        1.0 / static_cast<double>(an[static_cast<std::size_t>(i)]);
+    }
+  }
+  const double* log_int = log_int_tab.data();
+
   const int k_active_last = std::min(kstar, K);
   for (int k = kmin; k <= k_active_last; ++k) {
     const int k_idx = k - 1;
@@ -565,10 +665,31 @@ void update_d(SliceState& state, ModelData& model) {
       const double* ad_col = AD.col(p).data();
       const double d_kp = D_e(k_idx, p);
 
-      const double logp0 = log_1m_rho + loglik_target_col_active(
-        hosts, ad_col, A_col, d_kp, an.data(), obs, p, model.model_type, false);
-      const double logp1 = log_rho + loglik_target_col_active(
-        hosts, ad_col, A_col, d_kp, an.data(), obs, p, model.model_type, true);
+      double logp0 = log_1m_rho;
+      double logp1 = log_rho;
+      if (use_table) {
+        const std::size_t offset = static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
+        const int d_int = static_cast<int>(d_kp);
+        for (int i : hosts) {
+          const std::size_t cell = offset + static_cast<std::size_t>(i);
+          const int code = obs.obs_code[cell];
+          if (code == OBS_SKIP) continue;
+          const int n = an[static_cast<std::size_t>(i)];
+          const double inv_n = inv_an[static_cast<std::size_t>(i)];
+          // Carriers of the allele among the specimen's other strains
+          const int j0 = static_cast<int>(ad_col[i]) - d_int;
+          const double y = obs.y_col[cell];
+          const double r = obs.r_col[cell];
+          const double c = obs.loglik_const[cell];
+          logp0 += count_loglik_int(j0, n, inv_n, y, r, c, code, model_type, log_int);
+          logp1 += count_loglik_int(j0 + 1, n, inv_n, y, r, c, code, model_type, log_int);
+        }
+      } else {
+        logp0 += loglik_target_col_active(
+          hosts, ad_col, A_col, d_kp, an.data(), obs, p, model_type, false);
+        logp1 += loglik_target_col_active(
+          hosts, ad_col, A_col, d_kp, an.data(), obs, p, model_type, true);
+      }
 
       const double old_d = d_kp;
       const double new_d = unif_rand() < mh_ratio(logp1, logp0) ? 1.0 : 0.0;
@@ -619,6 +740,29 @@ double total_loglik_matrix(const Eigen::MatrixXd& A_e,
   const Eigen::MatrixXd ad = A_e * D_e;
   const Eigen::VectorXd an = A_e.rowwise().sum();
   double ll = 0.0;
+
+  if (snp_slicer::is_binary_count_model(model_type) &&
+      obs.has_loglik_const() && obs.has_obs_code()) {
+    // Every proportion is ad / an for integers, so use the log table.
+    const std::vector<double> log_int_tab =
+      make_log_int_table(2 * static_cast<int>(A_e.cols()) + 1);
+    const double* log_int = log_int_tab.data();
+    for (int p = 0; p < P; ++p) {
+      const std::size_t offset = static_cast<std::size_t>(p) * static_cast<std::size_t>(N);
+      for (int i = 0; i < N; ++i) {
+        const std::size_t cell = offset + static_cast<std::size_t>(i);
+        const int code = obs.obs_code[cell];
+        if (code == OBS_SKIP) continue;
+        const int n = static_cast<int>(an(i));
+        if (n <= 0) return R_NaN;  // a specimen with no strains has no proportion
+        ll += count_loglik_int(
+          static_cast<int>(ad(i, p)), n, 1.0 / static_cast<double>(n), obs.y_col[cell],
+          obs.r_col[cell], obs.loglik_const[cell], code, model_type, log_int);
+      }
+    }
+    return ll;
+  }
+
   for (int p = 0; p < P; ++p) {
     for (int i = 0; i < N; ++i) {
       const double an_i = an(i);
@@ -700,7 +844,8 @@ Rcpp::List cpp_update_a(Rcpp::NumericMatrix A,
                         Rcpp::Nullable<Rcpp::NumericVector> loglik_const = R_NilValue,
                         Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   snp_slicer::kernel::SliceState state;
-  state.A = A;
+  // update_a writes A in place; clone so the caller's matrix is left untouched.
+  state.A = Rcpp::clone(A);
   state.D = D;
   state.mu = mu;
   state.kplus = kplus;
@@ -733,7 +878,8 @@ Rcpp::List cpp_update_a_multinomial(Rcpp::NumericMatrix A,
                                     Rcpp::IntegerVector col_offset,
                                     Rcpp::NumericMatrix r_totals) {
   snp_slicer::kernel::SliceState state;
-  state.A = A;
+  // update_a_multinomial writes A in place; clone so the caller's matrix is left untouched.
+  state.A = Rcpp::clone(A);
   state.mu = mu;
   state.kplus = kplus;
   state.kstar = kstar;
@@ -761,7 +907,8 @@ Rcpp::NumericMatrix cpp_update_d(Rcpp::NumericMatrix A,
                                  Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   snp_slicer::kernel::SliceState state;
   state.A = A;
-  state.D = D;
+  // update_d writes D in place; clone so the caller's matrix is left untouched.
+  state.D = Rcpp::clone(D);
   state.kmin = kmin;
   state.kstar = kstar;
 
@@ -798,9 +945,11 @@ Rcpp::List cpp_slice_iter(Rcpp::NumericMatrix A,
                           Rcpp::Nullable<Rcpp::IntegerVector> obs_code = R_NilValue) {
   Rcpp::RNGScope rng_scope;
   snp_slicer::kernel::SliceState state;
-  state.A = A;
-  state.D = D;
-  state.mu = mu;
+  // The updates write A, D and mu in place. R callers keep earlier states alive
+  // (the MAP state, stored samples), so work on copies rather than the inputs.
+  state.A = Rcpp::clone(A);
+  state.D = Rcpp::clone(D);
+  state.mu = Rcpp::clone(mu);
   state.kplus = kplus;
   state.kstar = kstar;
   state.kmin = kmin;
